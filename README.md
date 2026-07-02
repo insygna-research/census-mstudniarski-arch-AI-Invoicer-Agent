@@ -43,7 +43,7 @@ flowchart LR
 
 ### Legal-grounded corrective RAG
 
-Foreign-invoice tax reasoning is **grounded in real Polish VAT law**, not the model's memory: the agent retrieves the relevant provisions (`art. 28b`, `art. 17` reverse charge, WNT, import) from a **pgvector** store (embeddings + reranking via **Voyage AI**), generates a classification that **cites its legal basis**, then a **faithfulness check** verifies each citation is actually supported by the source. When grounding is weak or unsupported, the agent **abstains** — it caps its confidence and flags the human, never auto-booking. Retrieval quality, faithfulness, and with/without-RAG treatment accuracy are measured in [`docs/evals/legal-rag-report.md`](docs/evals/legal-rag-report.md).
+Foreign-invoice tax reasoning is **grounded in real Polish VAT law**, not the model's memory: the agent retrieves the relevant provisions (`art. 28b`, `art. 17` reverse charge, WNT, import) from a **pgvector** store (embeddings + reranking via **Voyage AI**), generates a classification that **cites its legal basis**, then a **faithfulness check** verifies each citation is actually supported by the source. When grounding is weak or unsupported, the agent **abstains** — it caps its confidence and flags the human, never auto-booking. Retrieval quality (recall@5 / MRR) is measured over a **30-case golden dataset** in [`docs/evals/legal-rag-report.md`](docs/evals/legal-rag-report.md); the with/without-RAG treatment-accuracy ablation and citation-faithfulness checks are implemented in `scripts/run_evals.py` and unit-tested via `render_report`, ready to populate the report against the live stack.
 
 See all three grounding states (abstention / grounded / unsupported) in one command:
 `PYTHONPATH=src uv run python scripts/rag_demo.py`.
@@ -262,13 +262,16 @@ Manual deploy: `fly deploy --remote-only -a <app>`.
 
 ## Testing
 
-- **351 unit/integration tests + 10 live-gated** — TDD throughout (failing test → minimal implementation → commit).
+- **352 unit/integration tests + 10 live-gated** — TDD throughout (failing test → minimal implementation → commit).
 - The full pipeline (real `interrupt`/resume HITL and the corrective-RAG sub-flow) runs deterministically in CI via injected fakes.
 - Live tests hitting real Anthropic / Voyage / pgvector / Fakturownia / Gmail are gated behind their env vars and skip otherwise.
+- **Evals** — retrieval (recall@5 / MRR) over a 30-case golden dataset in [`docs/evals/legal-rag-report.md`](docs/evals/legal-rag-report.md); grounded-classification accuracy (with/without-RAG ablation) + citation faithfulness are wired in `scripts/run_evals.py`.
+- **CI gates** — `ruff check` · `ruff format --check` · **`mypy`** (typed, 0 errors) · tests with **coverage ≥ 84%** (`--cov-fail-under`) · `pip-audit`.
 
 ```bash
-uv run pytest -q          # 351 passed, 10 skipped (live)
+uv run pytest -q --cov=invoicer   # 352 passed, 10 skipped; coverage gated in CI (fail-under 84%)
 uv run ruff check .
+uv run mypy
 ```
 
 ## Scripts
