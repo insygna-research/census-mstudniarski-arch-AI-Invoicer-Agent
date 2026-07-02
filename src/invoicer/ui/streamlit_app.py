@@ -214,7 +214,7 @@ if "graph" not in st.session_state:
     st.session_state.thread_id = None
 
 uploaded = st.file_uploader("Faktura (PDF)", type=["pdf"])
-if st.button("▶ PRZETWÓRZ", disabled=uploaded is None, type="primary"):
+if st.button("▶ PRZETWÓRZ", disabled=uploaded is None, type="primary") and uploaded is not None:
     doc = document_from_upload(uploaded.name, uploaded.getvalue())
     st.session_state.thread_id = str(uuid.uuid4())
     st.session_state.payload = start_document(

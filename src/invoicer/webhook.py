@@ -71,6 +71,9 @@ def create_inbound_app(
         form = await request.form()
         params = {k: str(v) for k, v in form.items()}
         if enforce_signature:
+            # enforce_signature => oba nie sa None (patrz wyzej); guard tylko dla type-checkera.
+            if twilio_auth_token is None or public_url is None:
+                return JSONResponse({"status": "invalid_signature"}, status_code=403)
             sig = request.headers.get("X-Twilio-Signature", "")
             expected = compute_twilio_signature(twilio_auth_token, public_url, params)
             if not (sig and hmac.compare_digest(expected, sig)):
@@ -104,7 +107,9 @@ def create_inbound_app(
         return HTMLResponse(html, status_code=status)
 
     def _authorized(thread_id: str, decision: str, token: str) -> bool:
-        return bool(link_secret) and verify_decision(link_secret, thread_id, decision, token)
+        if not link_secret:
+            return False
+        return verify_decision(link_secret, thread_id, decision, token)
 
     def _confirm_page(thread_id: str, decision: str, token: str) -> HTMLResponse:
         # GET pokazuje TYLKO formularz — NIE ksieguje. Klucz bezpieczenstwa: link-preview

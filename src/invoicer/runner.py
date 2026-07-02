@@ -31,7 +31,7 @@ from invoicer.models import (
     TaxTreatment,
     ValidationResult,
 )
-from invoicer.ports import EmailSource, InvoiceDetector
+from invoicer.ports import EmailSource, ExceptionReasoner, InvoiceDetector, InvoiceExtractor
 from invoicer.rag.models import RetrievedChunk
 from invoicer.state import InvoiceState
 
@@ -176,8 +176,8 @@ def build_demo_graph(*, ledger_path: Path):
         from invoicer.adapters.claude_extractor import ClaudeVisionExtractor
         from invoicer.adapters.claude_reasoner import ClaudeExceptionReasoner
 
-        extractor = ClaudeVisionExtractor()
-        reasoner = ClaudeExceptionReasoner()
+        extractor: InvoiceExtractor = ClaudeVisionExtractor()
+        reasoner: ExceptionReasoner = ClaudeExceptionReasoner()
     else:
         extractor = StubExtractor(_demo_invoice())
         reasoner = IdentityReasoner()

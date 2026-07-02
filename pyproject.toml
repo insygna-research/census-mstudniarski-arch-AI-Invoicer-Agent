@@ -26,6 +26,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "mypy>=1.14,<2",
     "pip-audit>=2.10.1",
     "pytest>=8.0",
     "ruff>=0.5",
@@ -48,3 +49,21 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src"]
+check_untyped_defs = true
+warn_unused_ignores = true
+ignore_missing_imports = true
+
+# langchain-anthropic: ChatAnthropic(model=...) jest poprawne w runtime (model to alias
+# pola model_name, validate_by_name=True), ale stuby mypy rozwiazuja pole po nazwie
+# pythonowej i zglaszaja falszywe [call-arg]. Wyciszamy tylko ten kod w adapterach Claude.
+[[tool.mypy.overrides]]
+module = [
+    "invoicer.adapters.claude_extractor",
+    "invoicer.adapters.claude_reasoner",
+    "invoicer.adapters.claude_detector",
+]
+disable_error_code = ["call-arg"]

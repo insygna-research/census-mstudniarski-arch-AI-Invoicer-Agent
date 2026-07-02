@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from invoicer.security import redact_pii
+
+if TYPE_CHECKING:
+    from sentry_sdk.types import Event, Hint
 
 
 def _redact_obj(obj: Any) -> Any:
@@ -23,7 +26,7 @@ def _redact_obj(obj: Any) -> Any:
     return obj
 
 
-def _scrub(event: dict, hint: Any) -> dict:
+def _scrub(event: Event, hint: Hint) -> Event | None:
     """before_send: scrubuje PII z calego eventu Sentry."""
     return _redact_obj(event)
 

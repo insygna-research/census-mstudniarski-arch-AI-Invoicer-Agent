@@ -58,7 +58,9 @@ def make_retrieve_legal_context_node(
         return store.search(query, k=k)
 
     def retrieve_legal_context(state: InvoiceState) -> dict:
-        query = build_retrieval_query(state["invoice"])
+        invoice = state["invoice"]
+        assert invoice is not None  # graf gwarantuje invoice po wezle extract
+        query = build_retrieval_query(invoice)
         hits = _search(query)
         relevant = [h for h in hits if h.score >= threshold]
         return {"legal_context": relevant}
@@ -70,7 +72,9 @@ def make_validate_node(ledger: Ledger):
     """Wezel `validate`: deterministyczna walidacja + wykrywanie duplikatow (ledger)."""
 
     def validate(state: InvoiceState) -> dict:
-        return {"validation": validate_invoice(state["invoice"], ledger=ledger)}
+        invoice = state["invoice"]
+        assert invoice is not None  # graf gwarantuje invoice po wezle extract
+        return {"validation": validate_invoice(invoice, ledger=ledger)}
 
     return validate
 
@@ -82,7 +86,9 @@ def route_after_validate(state: InvoiceState) -> str:
     ani do ksiegowania — pomijamy cicho (log). Straznik w `book` zostaje jako defense-in-depth.
     Zwykle bledy walidacji (NIP/sumy) NIE sa duplikatem -> nadal ida do human_review.
     """
-    if state["validation"].is_duplicate:
+    validation = state["validation"]
+    assert validation is not None  # graf gwarantuje validation po wezle validate
+    if validation.is_duplicate:
         invoice = state.get("invoice")
         number = invoice.number if invoice is not None else "?"
         _logger.info("validate: faktura %s juz zaksiegowana — pomijam (duplikat)", number)
@@ -134,6 +140,7 @@ def classify_node(state: InvoiceState) -> dict:
     -> verify_grounding.
     """
     invoice = state["invoice"]
+    assert invoice is not None  # graf gwarantuje invoice po wezle extract
     country = invoice.seller.country.upper()
     if country == "PL":
         classification = Classification(
@@ -169,8 +176,11 @@ def human_review(state: InvoiceState) -> dict:
     Zwracana wartosc resume (Command(resume=...)) trafia do human_decision.
     """
     invoice = state["invoice"]
+    assert invoice is not None  # graf gwarantuje invoice/validation/classification przed HITL
     validation = state["validation"]
+    assert validation is not None
     classification = state["classification"]
+    assert classification is not None
     payload = {
         "number": invoice.number,
         "seller": invoice.seller.name,
@@ -210,11 +220,13 @@ def make_book_node(
 
     def book(state: InvoiceState, config: RunnableConfig) -> dict:
         invoice = state["invoice"]
+        assert invoice is not None  # graf gwarantuje invoice/classification przed book
         if ledger.is_duplicate(invoice.number, invoice.seller.nip, invoice.seller.name):
             raise RuntimeError(
                 f"Faktura {invoice.number} jest juz zaksiegowana — przerwano podwojne ksiegowanie"
             )
         classification = state["classification"]
+        assert classification is not None
         treatment = str(classification.treatment)
         thread_id = (config or {}).get("configurable", {}).get("thread_id", "")
         payload = invoice_to_booking_payload(invoice, treatment=treatment)
@@ -262,7 +274,10 @@ def make_reason_exception_node(reasoner: ExceptionReasoner):
     """
 
     def reason_exception(state: InvoiceState) -> dict:
+        invoice = state["invoice"]
+        assert invoice is not None  # graf gwarantuje invoice/classification przed reason_exception
         base = state["classification"]
+        assert base is not None
         context = state.get("legal_context", [])
         if not context:
             weak = base.model_copy(
@@ -276,7 +291,7 @@ def make_reason_exception_node(reasoner: ExceptionReasoner):
                 }
             )
             return {"classification": weak}
-        enriched = reasoner.reason(state["invoice"], base, context)
+        enriched = reasoner.reason(invoice, base, context)
         return {"classification": enriched}
 
     return reason_exception
@@ -284,7 +299,9 @@ def make_reason_exception_node(reasoner: ExceptionReasoner):
 
 def route_after_classify(state: InvoiceState) -> str:
     """Krawedz po classify: PL -> human_review; zagranica -> retrieve_legal_context (RAG)."""
-    if state["classification"].country_bucket == CountryBucket.PL:
+    classification = state["classification"]
+    assert classification is not None  # graf gwarantuje classification po wezle classify
+    if classification.country_bucket == CountryBucket.PL:
         return "human_review"
     return "retrieve_legal_context"
 
@@ -306,6 +323,7 @@ def make_verify_grounding_node():
 
     def verify_grounding(state: InvoiceState) -> dict:
         classification = state["classification"]
+        assert classification is not None  # graf gwarantuje classification po reason_exception
         if classification.grounding_status == GroundingStatus.WEAK:
             return {"classification": classification}  # abstention juz ustawione w reason_exception
         by_ref = {(c.source_id, c.article_ref): c.text for c in state.get("legal_context", [])}
