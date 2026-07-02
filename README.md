@@ -138,6 +138,15 @@ Two complementary dedup layers plus a tamper-evident ledger:
 
 Python 3.12 · [uv](https://github.com/astral-sh/uv) · **LangGraph** (state graph, `interrupt`, SQLite checkpointer) · **langchain-anthropic** (`ChatAnthropic`, `with_structured_output`, multimodal) · **Voyage AI** (embeddings + rerank) · **pgvector** / **psycopg** (Postgres) · **FastAPI** + **APScheduler** (webhook + interval intake) · **google-api-python-client** (Gmail) · **Twilio** (WhatsApp, via httpx) · **Sentry** · **LangSmith** · Pydantic v2 · pytest · ruff.
 
+## How it was built
+
+Spec-driven, AI-assisted TDD. Every feature here started as a written design spec, was
+decomposed into a step-by-step plan, and was implemented red→green with Claude Code as the
+pair programmer. The whole paper trail — **10 specs and 21 plans** — is committed under
+[`docs/superpowers/`](docs/superpowers/), so you can audit the path from "what should exist"
+to the code that exists. The architecture decisions (ports-and-adapters, the hard human gate,
+grounded-RAG-with-abstention) and every green test are the point; the keystrokes were shared.
+
 ## Run it
 
 ### Offline (no keys) — see the whole flow against fakes
