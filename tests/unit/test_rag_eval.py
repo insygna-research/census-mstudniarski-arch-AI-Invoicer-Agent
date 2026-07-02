@@ -42,3 +42,23 @@ def test_faithfulness_rate_counts_supported_citations():
 
 def test_faithfulness_rate_no_citations_is_zero():
     assert faithfulness_rate([], [_CHUNK]) == 0.0
+
+
+def test_render_report_includes_all_metrics_and_ablation_delta():
+    from invoicer.rag.eval import render_report
+
+    report = render_report(
+        generated="2026-07-02",
+        retrieval={"k": 5, "n": 30, "recall_at_k": 0.97, "mrr": 0.81},
+        with_rag={"n": 30, "accuracy": 0.93, "faithfulness": 0.9},
+        without_rag={"n": 30, "accuracy": 0.7},
+        setup="pgvector · voyage-3-large · rerank-2.5 · claude-sonnet-4-6",
+    )
+    assert "Recall@5: **0.97**" in report
+    assert "MRR: **0.81**" in report
+    assert "with RAG**: **0.93**" in report
+    assert "without RAG**: **0.70**" in report
+    assert "**+0.23**" in report  # delta ablacji
+    assert "Faithfulness" in report and "**0.90**" in report
+    assert "2026-07-02" in report
+    assert "Cases: **30**" in report

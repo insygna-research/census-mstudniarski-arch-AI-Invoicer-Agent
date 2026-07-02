@@ -80,3 +80,30 @@ def faithfulness_rate(citations: list[Citation], context: list[RetrievedChunk]) 
         if _span_supported(cit.quoted_span, by_ref.get((cit.source_id, cit.article_ref), ""))
     )
     return supported / len(citations)
+
+
+def render_report(
+    *,
+    generated: str,
+    retrieval: dict,
+    with_rag: dict,
+    without_rag: dict,
+    setup: str,
+) -> str:
+    """Renderuje raport eval (markdown). Czysta funkcja — testowalna bez kluczy API."""
+    delta = with_rag["accuracy"] - without_rag["accuracy"]
+    return (
+        "# Legal-Grounded RAG — Eval Report\n\n"
+        f"- Generated: {generated}\n"
+        f"- Cases: **{retrieval['n']}** (golden dataset, `data/evals/legal_cases.jsonl`)\n"
+        f"- Setup: {setup}\n\n"
+        "## Retrieval\n\n"
+        f"- Recall@{retrieval['k']}: **{retrieval['recall_at_k']:.2f}**\n"
+        f"- MRR: **{retrieval['mrr']:.2f}**\n\n"
+        "## Reasoning (grounded classification)\n\n"
+        f"- Treatment accuracy **with RAG**: **{with_rag['accuracy']:.2f}**\n"
+        f"- Treatment accuracy **without RAG**: **{without_rag['accuracy']:.2f}**\n"
+        f"- Ablation delta (with − without): **{delta:+.2f}**\n"
+        f"- Faithfulness (cytaty potwierdzone w zrodle): **{with_rag['faithfulness']:.2f}**\n\n"
+        "_Wygenerowane przez `scripts/run_evals.py` (Voyage + pgvector + Claude)._\n"
+    )
