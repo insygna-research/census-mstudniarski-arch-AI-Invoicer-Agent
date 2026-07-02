@@ -251,7 +251,7 @@ curl -s https://<app>.fly.dev/status | jq
 
 Point Twilio (Messaging → Sandbox → "When a message comes in") at `https://<app>.fly.dev/whatsapp/inbound` (POST).
 
-**Auto-deploy:** pushing to `main` triggers `.github/workflows/fly-deploy.yml` (`flyctl deploy --remote-only`). It needs a `FLY_API_TOKEN` GitHub secret:
+**Auto-deploy:** after a green `CI` run on `main`, `.github/workflows/deploy.yml` deploys the **CI-tested commit** to Fly (`flyctl deploy --remote-only`) — so only code that passed tests ever ships. It needs a `FLY_API_TOKEN` GitHub secret:
 
 ```bash
 fly tokens create deploy -a <app>
