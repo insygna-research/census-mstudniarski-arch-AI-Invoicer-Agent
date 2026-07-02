@@ -7,8 +7,8 @@ INVOICER_SINK=fakturownia => realna faktura po TAK (inaczej MockSubiekt).
 
 Uzycie (invoicer jest pod src/):
     set -a; source .env; set +a
-    PYTHONPATH=src uv run python scripts/run_flow_now.py            # tryb Gmail (dzisiejsze faktury)
-    PYTHONPATH=src uv run python scripts/run_flow_now.py fv.pdf     # tryb pliku (konkretny PDF)
+    PYTHONPATH=src uv run python scripts/run_flow_now.py         # tryb Gmail (dzisiejsze faktury)
+    PYTHONPATH=src uv run python scripts/run_flow_now.py fv.pdf  # tryb pliku (konkretny PDF)
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ import os
 import sys
 import time
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 
@@ -71,10 +71,13 @@ def _documents() -> list[InvoiceDocument]:
 
 
 def _wait_for_decision(client: httpx.Client, since: datetime):
-    """Czeka (poll Twilio) na odpowiedz inbound od APPROVER po `since`; zwraca ('approve'/'reject', body) lub (None, None)."""
+    """Czeka (poll Twilio) na odpowiedz inbound od APPROVER po `since`.
+
+    Zwraca ('approve'/'reject', body) lub (None, None).
+    """
     url = f"https://api.twilio.com/2010-04-01/Accounts/{SID}/Messages.json"
     deadline = since + timedelta(minutes=TIMEOUT_MIN)
-    while datetime.now(timezone.utc) < deadline:
+    while datetime.now(UTC) < deadline:
         r = client.get(
             url, params={"To": SANDBOX, "From": APPROVER, "PageSize": 20}, auth=(SID, TOKEN)
         )
@@ -181,7 +184,7 @@ def main() -> None:
                 processed.mark(key, "skipped")
                 stats["duplicate"] += 1
                 continue
-            since = datetime.now(timezone.utc)
+            since = datetime.now(UTC)
             try:
                 channel.request_approval(payload)
             except TwilioError as exc:
@@ -190,8 +193,10 @@ def main() -> None:
                 continue
             stats["sent"] += 1
             print(
-                f"[{doc.filename}] wyslano: {payload['seller']} / NIP {payload.get('seller_nip') or '—'} / "
-                f"{payload['total_gross']} {payload['currency']}. Odpowiedz TAK/NIE (max {TIMEOUT_MIN} min)...",
+                f"[{doc.filename}] wyslano: {payload['seller']} / "
+                f"NIP {payload.get('seller_nip') or '—'} / "
+                f"{payload['total_gross']} {payload['currency']}. "
+                f"Odpowiedz TAK/NIE (max {TIMEOUT_MIN} min)...",
                 flush=True,
             )
             decision, body = _wait_for_decision(client, since)
@@ -223,12 +228,13 @@ def main() -> None:
                 )
                 stats["error"] += 1
 
+    pending = stats["sent"] - stats["booked"] - stats["rejected"] - stats["timeout"]
     print(
         f"\nRAZEM ({len(docs)} dok): "
         f"zaksiegowane={stats['booked']}, duplikaty={stats['duplicate']}, "
         f"juz obsluzone={stats['dedup']}, odrzucone={stats['rejected']}, "
         f"timeout={stats['timeout']}, bledy={stats['error']}, "
-        f"wyslane (oczekujace)={stats['sent'] - stats['booked'] - stats['rejected'] - stats['timeout']}",
+        f"wyslane (oczekujace)={pending}",
         flush=True,
     )
 
