@@ -72,6 +72,46 @@ def test_other_exception_types_are_not_caught():
     assert sleeps == []
 
 
+def test_retries_raw_genai_server_error_503():
+    # google.genai.errors.ServerError NIE jest opakowywany w ChatGoogleGenerativeAIError
+    # przez langchain-google-genai — 503 "high demand" tez musi byc ponawiany.
+    from google.genai import errors as genai_errors
+
+    sleeps: list[float] = []
+    attempts = iter(
+        [
+            genai_errors.ServerError(
+                503, {"error": {"message": "high demand", "status": "UNAVAILABLE"}}
+            ),
+            "ok",
+        ]
+    )
+
+    def flaky():
+        item = next(attempts)
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+    assert call_with_rate_limit_retry(flaky, wait_s=35.0, sleep=sleeps.append) == "ok"
+    assert sleeps == [35.0]
+
+
+def test_raw_genai_client_error_400_is_not_retried():
+    from google.genai import errors as genai_errors
+
+    sleeps: list[float] = []
+
+    def broken():
+        raise genai_errors.ClientError(
+            400, {"error": {"message": "invalid argument", "status": "INVALID_ARGUMENT"}}
+        )
+
+    with pytest.raises(genai_errors.ClientError):
+        call_with_rate_limit_retry(broken, sleep=sleeps.append)
+    assert sleeps == []
+
+
 class _FlakyStructured:
     """Fake structured-output: pierwsze invoke -> 429, potem wynik."""
 
