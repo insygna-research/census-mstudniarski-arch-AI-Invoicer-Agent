@@ -115,8 +115,10 @@ def test_reason_merges_judgment_with_deterministic_bucket():
 
 
 def test_default_construction_does_not_raise():
+    # Tekstowy osad jedzie na flash-lite: osobna dzienna pula darmowego tieru,
+    # flash zostaje zarezerwowany dla ekstrakcji vision.
     reasoner = GeminiExceptionReasoner()
-    assert reasoner._model == "gemini-2.5-flash"
+    assert reasoner._model == "gemini-2.5-flash-lite"
 
 
 def _ctx():

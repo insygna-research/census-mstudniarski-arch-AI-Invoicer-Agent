@@ -5,10 +5,14 @@ from typing import Any
 
 from langchain_core.messages import HumanMessage
 
+from invoicer.adapters.gemini_retry import call_with_rate_limit_retry
 from invoicer.extraction import InvoiceExtraction, extraction_to_invoice
 from invoicer.models import Invoice, InvoiceDocument
 
-_DEFAULT_MODEL = "gemini-2.5-flash"
+# Ekstrakcja vision zostaje na flash (najlepsza jakosc dokumentow); ciasna dzienna
+# pula darmowego tieru jest zarezerwowana wylacznie dla niej — detektor i reasoner
+# jada na flash-lite (osobna pula per model).
+DEFAULT_MODEL = "gemini-2.5-flash"
 
 EXTRACTION_PROMPT = (
     "Jestes asystentem ksiegowym. Wyciagnij dane z zalaczonej faktury i wypelnij "
@@ -52,7 +56,7 @@ class GeminiVisionExtractor:
     """
 
     def __init__(
-        self, *, model: str = _DEFAULT_MODEL, llm: Any = None, callbacks: list | None = None
+        self, *, model: str = DEFAULT_MODEL, llm: Any = None, callbacks: list | None = None
     ) -> None:
         self._model = model
         self._llm = llm
@@ -68,5 +72,5 @@ class GeminiVisionExtractor:
     def extract(self, document: InvoiceDocument) -> Invoice:
         message = build_extraction_message(document)
         structured = self._client().with_structured_output(InvoiceExtraction)
-        extraction = structured.invoke([message])
+        extraction = call_with_rate_limit_retry(lambda: structured.invoke([message]))
         return extraction_to_invoice(extraction)

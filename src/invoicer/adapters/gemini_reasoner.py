@@ -4,12 +4,15 @@ from typing import Any
 
 from langchain_core.messages import HumanMessage
 
+from invoicer.adapters.gemini_retry import call_with_rate_limit_retry
 from invoicer.models import Classification, Invoice
 from invoicer.rag.models import RetrievedChunk
 from invoicer.rag.query import build_retrieval_query
 from invoicer.reasoning import ClassificationJudgment, judgment_to_classification
 
-_DEFAULT_MODEL = "gemini-2.5-flash"
+# Tekstowy osad VAT na flash-lite: osobna dzienna pula darmowego tieru, a flash
+# (20 zapytan/dzien) zostaje w calosci dla ekstrakcji vision.
+DEFAULT_MODEL = "gemini-2.5-flash-lite"
 
 REASON_PROMPT = (
     "Jestes ekspertem od polskiego VAT. Faktura pochodzi od sprzedawcy ZAGRANICZNEGO "
@@ -48,7 +51,7 @@ class GeminiExceptionReasoner:
     """
 
     def __init__(
-        self, *, model: str = _DEFAULT_MODEL, llm: Any = None, callbacks: list | None = None
+        self, *, model: str = DEFAULT_MODEL, llm: Any = None, callbacks: list | None = None
     ) -> None:
         self._model = model
         self._llm = llm
@@ -66,5 +69,5 @@ class GeminiExceptionReasoner:
     ) -> Classification:
         message = build_reason_message(invoice, context)
         structured = self._client().with_structured_output(ClassificationJudgment)
-        judgment = structured.invoke([message])
+        judgment = call_with_rate_limit_retry(lambda: structured.invoke([message]))
         return judgment_to_classification(judgment, base.country_bucket)

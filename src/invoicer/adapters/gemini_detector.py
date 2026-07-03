@@ -7,9 +7,12 @@ from langchain_core.messages import HumanMessage
 from pydantic import BaseModel
 
 from invoicer.adapters.gemini_extractor import _mime_and_block
+from invoicer.adapters.gemini_retry import call_with_rate_limit_retry
 from invoicer.models import InvoiceDocument
 
-_DEFAULT_MODEL = "gemini-2.5-flash"
+# Proste tak/nie na flash-lite: osobna dzienna pula darmowego tieru, a flash
+# (20 zapytan/dzien) zostaje w calosci dla ekstrakcji vision.
+DEFAULT_MODEL = "gemini-2.5-flash-lite"
 
 DETECTION_PROMPT = (
     "Jestes asystentem ksiegowym. Ocen, czy zalaczony dokument to FAKTURA lub RACHUNEK "
@@ -44,7 +47,7 @@ class GeminiInvoiceDetector:
     """
 
     def __init__(
-        self, *, model: str = _DEFAULT_MODEL, llm: Any = None, callbacks: list | None = None
+        self, *, model: str = DEFAULT_MODEL, llm: Any = None, callbacks: list | None = None
     ) -> None:
         self._model = model
         self._llm = llm
@@ -60,5 +63,5 @@ class GeminiInvoiceDetector:
     def is_invoice(self, document: InvoiceDocument) -> bool:
         message = build_detection_message(document)
         structured = self._client().with_structured_output(InvoiceCheck)
-        check = structured.invoke([message])
+        check = call_with_rate_limit_retry(lambda: structured.invoke([message]))
         return check.is_invoice

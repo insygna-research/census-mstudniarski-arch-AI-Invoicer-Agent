@@ -32,7 +32,7 @@ from invoicer.rag.query import build_retrieval_query
 
 _CASES = Path(__file__).resolve().parents[1] / "data" / "evals" / "legal_cases.jsonl"
 _REPORT = Path(__file__).resolve().parents[1] / "docs" / "evals" / "legal-rag-report.md"
-_SETUP = "pgvector · voyage-3-large · rerank-2.5 · gemini-2.5-flash"
+_SETUP = "pgvector · voyage-3-large · rerank-2.5 · gemini-2.5-flash-lite (reasoner)"
 
 
 def _store() -> PgVectorLegalStore:

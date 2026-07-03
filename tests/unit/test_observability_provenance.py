@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from invoicer.app import _METRICS_MODEL, _real_gemini_adapters
+from invoicer.app import _real_gemini_adapters
 from invoicer.ledger import Ledger, LedgerEntry
 from invoicer.observability import LlmMetrics, LlmMetricsCallback
 from invoicer.observability_status import PipelineCounters, pipeline_status
@@ -69,11 +69,14 @@ def test_old_entry_without_provenance_still_verifies(tmp_path):
 
 def test_real_gemini_adapters_get_metrics_callback():
     # Krytyczny fix: prod FAKTYCZNIE podpina LlmMetricsCallback (wczesniej /status zawsze $0).
+    # Model callbacku MUSI odpowiadac modelowi adaptera — inaczej /status liczy zly cennik
+    # (split: extractor na flash, reasoner na flash-lite).
     metrics = LlmMetrics()
     extractor, reasoner = _real_gemini_adapters(metrics)
-    assert any(isinstance(cb, LlmMetricsCallback) for cb in extractor._callbacks)
-    assert any(isinstance(cb, LlmMetricsCallback) for cb in reasoner._callbacks)
-    assert _METRICS_MODEL == "gemini-2.5-flash"
+    ext_cb = next(cb for cb in extractor._callbacks if isinstance(cb, LlmMetricsCallback))
+    rea_cb = next(cb for cb in reasoner._callbacks if isinstance(cb, LlmMetricsCallback))
+    assert ext_cb._model == extractor._model == "gemini-2.5-flash"
+    assert rea_cb._model == reasoner._model == "gemini-2.5-flash-lite"
 
 
 def test_run_config_tags_thread_id():

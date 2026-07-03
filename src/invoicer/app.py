@@ -85,16 +85,22 @@ def _settings_from_env() -> AppSettings:
     )
 
 
-_METRICS_MODEL = "gemini-2.5-flash"  # model adapterow Gemini (pricing dla LlmMetricsCallback)
-
-
 def _real_gemini_adapters(metrics: LlmMetrics):
-    """(extractor, reasoner) Gemini z LlmMetricsCallback — by /status mial realny koszt."""
-    from invoicer.adapters.gemini_extractor import GeminiVisionExtractor
-    from invoicer.adapters.gemini_reasoner import GeminiExceptionReasoner
+    """(extractor, reasoner) Gemini z LlmMetricsCallback — by /status mial realny koszt.
 
-    cb = LlmMetricsCallback(metrics, model=_METRICS_MODEL)
-    return GeminiVisionExtractor(callbacks=[cb]), GeminiExceptionReasoner(callbacks=[cb])
+    Osobne callbacki per adapter: split modeli (extractor: flash, reasoner: flash-lite)
+    oznacza rozne cenniki — model callbacku musi odpowiadac modelowi adaptera.
+    """
+    from invoicer.adapters import gemini_extractor, gemini_reasoner
+
+    return (
+        gemini_extractor.GeminiVisionExtractor(
+            callbacks=[LlmMetricsCallback(metrics, model=gemini_extractor.DEFAULT_MODEL)]
+        ),
+        gemini_reasoner.GeminiExceptionReasoner(
+            callbacks=[LlmMetricsCallback(metrics, model=gemini_reasoner.DEFAULT_MODEL)]
+        ),
+    )
 
 
 def _build_real_graph(settings: AppSettings, checkpointer, metrics: LlmMetrics):
@@ -200,7 +206,7 @@ def create_app(*, settings: AppSettings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def _lifespan(_: FastAPI):
-        from invoicer.adapters.gemini_detector import GeminiInvoiceDetector
+        from invoicer.adapters import gemini_detector
         from invoicer.adapters.gmail import GmailAdapter
         from invoicer.adapters.gmail_auth import gmail_service_from_token
 
@@ -211,8 +217,10 @@ def create_app(*, settings: AppSettings | None = None) -> FastAPI:
                 channel,
                 registry,
                 GmailAdapter(service, lookback_days=settings.gmail_lookback_days),
-                GeminiInvoiceDetector(
-                    callbacks=[LlmMetricsCallback(metrics, model=_METRICS_MODEL)]
+                gemini_detector.GeminiInvoiceDetector(
+                    callbacks=[
+                        LlmMetricsCallback(metrics, model=gemini_detector.DEFAULT_MODEL)
+                    ]
                 ),
                 sender=settings.gmail_sender,
                 phone=settings.approver_phone,

@@ -6,7 +6,13 @@ from invoicer.adapters.gemini_extractor import GeminiVisionExtractor
 from invoicer.adapters.gemini_reasoner import GeminiExceptionReasoner
 from invoicer.observability import LlmMetrics, LlmMetricsCallback
 
-_FACTORIES = [GeminiVisionExtractor, GeminiInvoiceDetector, GeminiExceptionReasoner]
+# Split modeli: flash tylko do ekstrakcji vision (ciasna dzienna pula darmowego tieru),
+# detektor i reasoner na flash-lite (osobna pula per model).
+_FACTORIES = [
+    (GeminiVisionExtractor, "gemini-2.5-flash"),
+    (GeminiInvoiceDetector, "gemini-2.5-flash-lite"),
+    (GeminiExceptionReasoner, "gemini-2.5-flash-lite"),
+]
 
 
 class _RecordingChat:
@@ -21,22 +27,22 @@ class _RecordingChat:
         return self
 
 
-def _cb() -> LlmMetricsCallback:
-    return LlmMetricsCallback(LlmMetrics(), model="gemini-2.5-flash")
+def _cb(model: str) -> LlmMetricsCallback:
+    return LlmMetricsCallback(LlmMetrics(), model=model)
 
 
-@pytest.mark.parametrize("factory", _FACTORIES)
-def test_adapter_passes_callbacks_to_chatgooglegenai(monkeypatch, factory):
+@pytest.mark.parametrize(("factory", "expected_model"), _FACTORIES)
+def test_adapter_passes_callbacks_to_chatgooglegenai(monkeypatch, factory, expected_model):
     monkeypatch.setattr(langchain_google_genai, "ChatGoogleGenerativeAI", _RecordingChat)
     _RecordingChat.last_kwargs = {}  # brak forwardu -> glosny KeyError, nie ciche stale
-    cb = _cb()
+    cb = _cb(expected_model)
     factory(callbacks=[cb])._client()
-    assert _RecordingChat.last_kwargs["model"] == "gemini-2.5-flash"
+    assert _RecordingChat.last_kwargs["model"] == expected_model
     assert _RecordingChat.last_kwargs["callbacks"] == [cb]
 
 
-@pytest.mark.parametrize("factory", _FACTORIES)
-def test_adapter_default_callbacks_is_none(monkeypatch, factory):
+@pytest.mark.parametrize(("factory", "expected_model"), _FACTORIES)
+def test_adapter_default_callbacks_is_none(monkeypatch, factory, expected_model):
     monkeypatch.setattr(langchain_google_genai, "ChatGoogleGenerativeAI", _RecordingChat)
     _RecordingChat.last_kwargs = {}  # brak forwardu -> glosny KeyError, nie ciche stale
     factory()._client()

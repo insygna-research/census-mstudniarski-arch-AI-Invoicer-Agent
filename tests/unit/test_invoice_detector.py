@@ -60,6 +60,13 @@ def test_gemini_detector_satisfies_protocol():
     assert isinstance(GeminiInvoiceDetector(llm=_FakeLLM(None)), InvoiceDetector)
 
 
+def test_gemini_detector_default_model_is_flash_lite():
+    # Proste tak/nie na flash-lite — flash zarezerwowany dla ekstrakcji vision.
+    from invoicer.adapters.gemini_detector import GeminiInvoiceDetector
+
+    assert GeminiInvoiceDetector(llm=_FakeLLM(None))._model == "gemini-2.5-flash-lite"
+
+
 def test_detection_message_has_text_and_pdf_block():
     from invoicer.adapters.gemini_detector import build_detection_message
 
