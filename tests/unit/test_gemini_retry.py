@@ -97,6 +97,24 @@ def test_retries_raw_genai_server_error_503():
     assert sleeps == [35.0]
 
 
+def test_retries_httpx_transport_error():
+    # "High demand" potrafi objawic sie tez zerwaniem polaczenia bez odpowiedzi —
+    # httpx.RemoteProtocolError wycieka surowo, ponizej warstwy bledow google.genai.
+    import httpx
+
+    sleeps: list[float] = []
+    attempts = iter([httpx.RemoteProtocolError("Server disconnected"), "ok"])
+
+    def flaky():
+        item = next(attempts)
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+    assert call_with_rate_limit_retry(flaky, wait_s=35.0, sleep=sleeps.append) == "ok"
+    assert sleeps == [35.0]
+
+
 def test_raw_genai_client_error_400_is_not_retried():
     from google.genai import errors as genai_errors
 

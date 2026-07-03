@@ -14,11 +14,12 @@ import time
 from collections.abc import Callable
 
 _WAIT_S = 35.0  # RetryInfo Google przy 429 sugeruje ~30 s; margines 5 s
-_RETRIES = 4
+_RETRIES = 6  # "high demand" potrafi trwac pare minut — 6 x 35 s to ~3,5 min pokrycia
 _RETRYABLE_CODES = (429, 500, 503)
 
 
 def _is_retryable(error: Exception) -> bool:
+    import httpx
     from google.genai import errors as genai_errors
     from langchain_google_genai.chat_models import ChatGoogleGenerativeAIError
 
@@ -26,7 +27,9 @@ def _is_retryable(error: Exception) -> bool:
         return "RESOURCE_EXHAUSTED" in str(error)
     if isinstance(error, genai_errors.APIError):
         return error.code in _RETRYABLE_CODES
-    return False
+    # zerwane polaczenie / timeout ponizej warstwy google.genai (obserwowane przy
+    # "high demand": serwer zamyka polaczenie bez odpowiedzi)
+    return isinstance(error, httpx.TransportError)
 
 
 def call_with_rate_limit_retry[T](
