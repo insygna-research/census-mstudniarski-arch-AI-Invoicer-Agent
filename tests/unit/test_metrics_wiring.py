@@ -6,12 +6,12 @@ from invoicer.adapters.gemini_extractor import GeminiVisionExtractor
 from invoicer.adapters.gemini_reasoner import GeminiExceptionReasoner
 from invoicer.observability import LlmMetrics, LlmMetricsCallback
 
-# Split modeli: flash tylko do ekstrakcji vision (ciasna dzienna pula darmowego tieru),
-# detektor i reasoner na flash-lite (osobna pula per model).
+# Split modeli: detektor (proste tak/nie) na flash-lite oszczedza ciasna dzienna pule
+# darmowego tieru; ekstrakcja vision i osad VAT na flash (jakosc — lite mylil wnt).
 _FACTORIES = [
     (GeminiVisionExtractor, "gemini-2.5-flash"),
     (GeminiInvoiceDetector, "gemini-2.5-flash-lite"),
-    (GeminiExceptionReasoner, "gemini-2.5-flash-lite"),
+    (GeminiExceptionReasoner, "gemini-2.5-flash"),
 ]
 
 

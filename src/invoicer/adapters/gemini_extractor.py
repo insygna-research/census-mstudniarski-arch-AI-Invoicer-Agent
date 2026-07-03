@@ -9,9 +9,9 @@ from invoicer.adapters.gemini_retry import call_with_rate_limit_retry
 from invoicer.extraction import InvoiceExtraction, extraction_to_invoice
 from invoicer.models import Invoice, InvoiceDocument
 
-# Ekstrakcja vision zostaje na flash (najlepsza jakosc dokumentow); ciasna dzienna
-# pula darmowego tieru jest zarezerwowana wylacznie dla niej — detektor i reasoner
-# jada na flash-lite (osobna pula per model).
+# Ekstrakcja vision na flash (najlepsza jakosc dokumentow). Flash dzieli ciasna
+# dzienna pule darmowego tieru z reasonerem; detektor (proste tak/nie) jedzie
+# na flash-lite (osobna pula per model).
 DEFAULT_MODEL = "gemini-2.5-flash"
 
 EXTRACTION_PROMPT = (

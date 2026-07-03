@@ -10,9 +10,10 @@ from invoicer.rag.models import RetrievedChunk
 from invoicer.rag.query import build_retrieval_query
 from invoicer.reasoning import ClassificationJudgment, judgment_to_classification
 
-# Tekstowy osad VAT na flash-lite: osobna dzienna pula darmowego tieru, a flash
-# (20 zapytan/dzien) zostaje w calosci dla ekstrakcji vision.
-DEFAULT_MODEL = "gemini-2.5-flash-lite"
+# Osad VAT na flash: na evalach flash-lite mylil wnt z import_towarow (de-goods) —
+# jakosc klasyfikacji podatkowej jest wazniejsza niz oszczedzanie dziennej kwoty.
+# Flash dzieli pule (20 zapytan/dzien darmowego tieru) z ekstrakcja vision.
+DEFAULT_MODEL = "gemini-2.5-flash"
 
 REASON_PROMPT = (
     "Jestes ekspertem od polskiego VAT. Faktura pochodzi od sprzedawcy ZAGRANICZNEGO "

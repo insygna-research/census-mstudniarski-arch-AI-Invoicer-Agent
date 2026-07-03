@@ -57,7 +57,7 @@ Ports-and-adapters around a LangGraph state machine — the core depends only on
 | `EmailSource` | `FixtureSource` / upload | **`GmailAdapter`** ✅ (Gmail API, `gmail.modify`) |
 | `InvoiceDetector` | `StubInvoiceDetector` | **`GeminiInvoiceDetector`** ✅ (`gemini-2.5-flash-lite`) |
 | `InvoiceExtractor` | `StubExtractor` | **`GeminiVisionExtractor`** ✅ (`gemini-2.5-flash`) |
-| `ExceptionReasoner` | `IdentityReasoner` / `StubExceptionReasoner` | **`GeminiExceptionReasoner`** ✅ (`gemini-2.5-flash-lite`) |
+| `ExceptionReasoner` | `IdentityReasoner` / `StubExceptionReasoner` | **`GeminiExceptionReasoner`** ✅ (`gemini-2.5-flash`) |
 | `AccountingSink` | `MockSubiektSink` (offline/demo) | **`FakturowniaSink`** ✅ (REST, cost invoice) |
 | `ApprovalChannel` | `StubApprovalChannel` / CLI | **`TwilioWhatsAppChannel`** ✅ (+ signed tap-to-approve links) |
 | `Embedder` | `DeterministicEmbedder` (CI) | **`VoyageEmbedder`** ✅ (`voyage-3-large`) |

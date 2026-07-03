@@ -76,7 +76,7 @@ def test_real_gemini_adapters_get_metrics_callback():
     ext_cb = next(cb for cb in extractor._callbacks if isinstance(cb, LlmMetricsCallback))
     rea_cb = next(cb for cb in reasoner._callbacks if isinstance(cb, LlmMetricsCallback))
     assert ext_cb._model == extractor._model == "gemini-2.5-flash"
-    assert rea_cb._model == reasoner._model == "gemini-2.5-flash-lite"
+    assert rea_cb._model == reasoner._model == "gemini-2.5-flash"
 
 
 def test_run_config_tags_thread_id():

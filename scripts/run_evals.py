@@ -20,9 +20,11 @@ from invoicer.adapters.voyage_reranker import VoyageReranker
 from invoicer.graph.nodes import EU_COUNTRIES
 from invoicer.models import Classification, CountryBucket, Invoice, TaxTreatment
 from invoicer.rag.eval import (
+    append_checkpoint,
     build_invoice_from_case,
     faithfulness_rate,
     load_cases,
+    load_checkpoint,
     mean,
     recall_at_k,
     reciprocal_rank,
@@ -32,7 +34,10 @@ from invoicer.rag.query import build_retrieval_query
 
 _CASES = Path(__file__).resolve().parents[1] / "data" / "evals" / "legal_cases.jsonl"
 _REPORT = Path(__file__).resolve().parents[1] / "docs" / "evals" / "legal-rag-report.md"
-_SETUP = "pgvector · voyage-3-large · rerank-2.5 · gemini-2.5-flash-lite (reasoner)"
+# Checkpoint: dzienna kwota darmowego tieru (20 zapytan/model) nie miesci 60 wywolan —
+# przerwany bieg dokancza sie kolejnego dnia od miejsca przerwania. Kasowany po raporcie.
+_CHECKPOINT = Path(__file__).resolve().parents[1] / "data" / "evals" / ".eval_checkpoint.jsonl"
+_SETUP = "pgvector · voyage-3-large · rerank-2.5 · gemini-2.5-flash (reasoner)"
 
 
 def _store() -> PgVectorLegalStore:
@@ -51,7 +56,10 @@ def _base_classification(invoice: Invoice) -> Classification:
     )
 
 
-def evaluate_retrieval(k: int = 5) -> dict:
+def evaluate_retrieval(checkpoint: dict[str, dict], k: int = 5) -> dict:
+    if "retrieval" in checkpoint:
+        print("[retrieval] wynik z checkpointu")
+        return checkpoint["retrieval"]
     store = _store()
     cases = load_cases(_CASES)
     recalls, rrs = [], []
@@ -61,24 +69,42 @@ def evaluate_retrieval(k: int = 5) -> dict:
         expected = set(case["expected_article_refs"])
         recalls.append(recall_at_k(refs, expected, k=k))
         rrs.append(reciprocal_rank(refs, expected))
-    return {"k": k, "n": len(cases), "recall_at_k": mean(recalls), "mrr": mean(rrs)}
+    out = {"k": k, "n": len(cases), "recall_at_k": mean(recalls), "mrr": mean(rrs)}
+    append_checkpoint(_CHECKPOINT, "retrieval", out)
+    return out
 
 
-def evaluate_reasoning(*, with_rag: bool, k: int = 5) -> dict:
-    """Accuracy traktowania vs golden; przy with_rag dodatkowo faithfulness cytatow."""
+def evaluate_reasoning(checkpoint: dict[str, dict], *, with_rag: bool, k: int = 5) -> dict:
+    """Accuracy traktowania vs golden; przy with_rag dodatkowo faithfulness cytatow.
+
+    Kazdy przypadek trafia do checkpointu od razu po ocenie — przerwanie (dzienna
+    kwota Gemini) nie gubi postepu, kolejny bieg pomija ocenione przypadki.
+    """
+    label = "with-rag" if with_rag else "no-rag"
     store = _store() if with_rag else None
     reasoner = GeminiExceptionReasoner()
     cases = load_cases(_CASES)
     hits, faiths = [], []
     for case in cases:
+        key = f"{label}:{case['id']}"
+        cached = checkpoint.get(key)
+        if cached is not None:
+            hits.append(cached["hit"])
+            if with_rag:
+                faiths.append(cached["faithfulness"])
+            print(f"[{label}] {case['id']}: wynik z checkpointu")
+            continue
         invoice = build_invoice_from_case(case)
         context = store.search(build_retrieval_query(invoice), k=k) if store is not None else None
         result = reasoner.reason(invoice, _base_classification(invoice), context=context)
         hit = 1.0 if result.treatment.value == case["expected_treatment"] else 0.0
         hits.append(hit)
+        entry: dict = {"treatment": result.treatment.value, "hit": hit}
         if with_rag:
-            faiths.append(faithfulness_rate(result.citations, context or []))
-        label = "with-rag" if with_rag else "no-rag"
+            faith = faithfulness_rate(result.citations, context or [])
+            faiths.append(faith)
+            entry["faithfulness"] = faith
+        append_checkpoint(_CHECKPOINT, key, entry)
         print(
             f"[{label}] {case['id']}: {result.treatment.value} "
             f"(expected {case['expected_treatment']}) {'OK' if hit else 'MISS'}"
@@ -90,11 +116,14 @@ def evaluate_reasoning(*, with_rag: bool, k: int = 5) -> dict:
 
 
 def main() -> None:
-    retrieval = evaluate_retrieval(k=5)
+    checkpoint = load_checkpoint(_CHECKPOINT)
+    if checkpoint:
+        print(f"Wznawiam z checkpointu: {len(checkpoint)} wpisow ({_CHECKPOINT})")
+    retrieval = evaluate_retrieval(checkpoint, k=5)
     print(retrieval)
-    with_rag = evaluate_reasoning(with_rag=True)
+    with_rag = evaluate_reasoning(checkpoint, with_rag=True)
     print(with_rag)
-    without_rag = evaluate_reasoning(with_rag=False)
+    without_rag = evaluate_reasoning(checkpoint, with_rag=False)
     print(without_rag)
     _REPORT.parent.mkdir(parents=True, exist_ok=True)
     _REPORT.write_text(
@@ -107,6 +136,7 @@ def main() -> None:
         ),
         encoding="utf-8",
     )
+    _CHECKPOINT.unlink(missing_ok=True)  # pelny raport zapisany -> nastepny eval od zera
     print(f"Raport: {_REPORT}")
 
 

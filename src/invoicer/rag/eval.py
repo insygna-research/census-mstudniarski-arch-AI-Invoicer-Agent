@@ -10,6 +10,30 @@ from invoicer.models import Citation, Invoice, LineItem, Party
 from invoicer.rag.models import RetrievedChunk
 
 
+def load_checkpoint(path: Path) -> dict[str, dict]:
+    """Wczytuje checkpoint evalu (jsonl klucz->wynik); brak pliku -> pusty dict.
+
+    Dzienna kwota darmowego tieru Gemini (20 zapytan/model) wymusza dokanczanie
+    evalu przez wiele dni — checkpoint per przypadek robi postep trwalym.
+    Zduplikowany klucz: ostatni wpis wygrywa.
+    """
+    if not path.exists():
+        return {}
+    out: dict[str, dict] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            entry = json.loads(line)
+            out[entry["key"]] = entry["value"]
+    return out
+
+
+def append_checkpoint(path: Path, key: str, value: dict) -> None:
+    """Dopisuje jeden wynik do checkpointu (append-only jsonl, flush na wpis)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps({"key": key, "value": value}, ensure_ascii=False) + "\n")
+
+
 def recall_at_k(retrieved_refs: list[str], expected_refs: set[str], k: int) -> float:
     """Ulamek oczekiwanych article_ref obecnych w top-k zwroconych. Pusty expected -> 1.0."""
     if not expected_refs:

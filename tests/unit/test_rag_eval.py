@@ -52,7 +52,7 @@ def test_render_report_includes_all_metrics_and_ablation_delta():
         retrieval={"k": 5, "n": 30, "recall_at_k": 0.97, "mrr": 0.81},
         with_rag={"n": 30, "accuracy": 0.93, "faithfulness": 0.9},
         without_rag={"n": 30, "accuracy": 0.7},
-        setup="pgvector · voyage-3-large · rerank-2.5 · gemini-2.5-flash-lite (reasoner)",
+        setup="pgvector · voyage-3-large · rerank-2.5 · gemini-2.5-flash (reasoner)",
     )
     assert "Recall@5: **0.97**" in report
     assert "MRR: **0.81**" in report
@@ -62,3 +62,31 @@ def test_render_report_includes_all_metrics_and_ablation_delta():
     assert "Faithfulness" in report and "**0.90**" in report
     assert "2026-07-02" in report
     assert "Cases: **30**" in report
+
+
+def test_checkpoint_load_missing_file_is_empty(tmp_path):
+    from invoicer.rag.eval import load_checkpoint
+
+    assert load_checkpoint(tmp_path / "brak.jsonl") == {}
+
+
+def test_checkpoint_append_and_load_roundtrip(tmp_path):
+    # Dzienna kwota darmowego tieru (20 zapytan/model) wymusza dokanczanie evalu
+    # przez wiele dni — checkpoint per przypadek robi postep trwalym.
+    from invoicer.rag.eval import append_checkpoint, load_checkpoint
+
+    path = tmp_path / "cp.jsonl"
+    append_checkpoint(path, "with-rag:uk-saas", {"hit": 1.0, "faithfulness": 0.5})
+    append_checkpoint(path, "no-rag:uk-saas", {"hit": 0.0})
+    loaded = load_checkpoint(path)
+    assert loaded["with-rag:uk-saas"] == {"hit": 1.0, "faithfulness": 0.5}
+    assert loaded["no-rag:uk-saas"] == {"hit": 0.0}
+
+
+def test_checkpoint_last_write_wins(tmp_path):
+    from invoicer.rag.eval import append_checkpoint, load_checkpoint
+
+    path = tmp_path / "cp.jsonl"
+    append_checkpoint(path, "retrieval", {"recall_at_k": 0.5})
+    append_checkpoint(path, "retrieval", {"recall_at_k": 0.93})
+    assert load_checkpoint(path)["retrieval"] == {"recall_at_k": 0.93}

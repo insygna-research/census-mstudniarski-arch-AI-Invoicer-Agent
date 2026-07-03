@@ -115,10 +115,10 @@ def test_reason_merges_judgment_with_deterministic_bucket():
 
 
 def test_default_construction_does_not_raise():
-    # Tekstowy osad jedzie na flash-lite: osobna dzienna pula darmowego tieru,
-    # flash zostaje zarezerwowany dla ekstrakcji vision.
+    # Reasoner wrocil na flash: na evalach flash-lite pomylil wnt z import_towarow
+    # (przypadek de-goods) — jakosc osadu VAT wazniejsza niz oszczedzanie kwoty.
     reasoner = GeminiExceptionReasoner()
-    assert reasoner._model == "gemini-2.5-flash-lite"
+    assert reasoner._model == "gemini-2.5-flash"
 
 
 def _ctx():
