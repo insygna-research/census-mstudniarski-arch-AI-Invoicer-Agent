@@ -1,6 +1,6 @@
 """Narrated, OFFLINE przebieg calego flow — do nauki "jak to dziala od srodka".
 
-Buduje graf na FAKE'ach (StubExtractor + MockSubiekt, bez Gmaila/Claude/Twilio/API key),
+Buduje graf na FAKE'ach (StubExtractor + MockSubiekt, bez Gmaila/Gemini/Twilio/API key),
 przepuszcza jeden dokument i DRUKUJE stan po kazdym wezle, pokazujac dwie fazy:
   faza 1: extract -> validate -> classify -> (galaz zagr.) -> human_review = PAUZA (interrupt)
   faza 2: Command(resume="approve") -> book -> END   (tu odpala sie mark_read)

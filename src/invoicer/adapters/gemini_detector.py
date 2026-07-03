@@ -6,10 +6,10 @@ from typing import Any
 from langchain_core.messages import HumanMessage
 from pydantic import BaseModel
 
-from invoicer.adapters.claude_extractor import _mime_and_block
+from invoicer.adapters.gemini_extractor import _mime_and_block
 from invoicer.models import InvoiceDocument
 
-_DEFAULT_MODEL = "claude-sonnet-4-6"
+_DEFAULT_MODEL = "gemini-2.5-flash"
 
 DETECTION_PROMPT = (
     "Jestes asystentem ksiegowym. Ocen, czy zalaczony dokument to FAKTURA lub RACHUNEK "
@@ -36,10 +36,11 @@ def build_detection_message(document: InvoiceDocument) -> HumanMessage:
     )
 
 
-class ClaudeInvoiceDetector:
-    """InvoiceDetector oparty o Claude (vision) + structured output.
+class GeminiInvoiceDetector:
+    """InvoiceDetector oparty o Gemini (vision) + structured output.
 
-    LLM wstrzykiwalny (CI: fake; domyslnie leniwie ChatAnthropic). Realny call pokrywa test live.
+    LLM wstrzykiwalny (CI: fake; domyslnie leniwie ChatGoogleGenerativeAI).
+    Realny call pokrywa test live.
     """
 
     def __init__(
@@ -51,9 +52,9 @@ class ClaudeInvoiceDetector:
 
     def _client(self):
         if self._llm is None:
-            from langchain_anthropic import ChatAnthropic
+            from langchain_google_genai import ChatGoogleGenerativeAI
 
-            self._llm = ChatAnthropic(model=self._model, callbacks=self._callbacks)
+            self._llm = ChatGoogleGenerativeAI(model=self._model, callbacks=self._callbacks)
         return self._llm
 
     def is_invoice(self, document: InvoiceDocument) -> bool:

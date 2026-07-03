@@ -40,28 +40,28 @@ class _FakeLLM:
         return _FakeStructured(self._result)
 
 
-def test_claude_detector_returns_true_for_invoice():
-    from invoicer.adapters.claude_detector import ClaudeInvoiceDetector, InvoiceCheck
+def test_gemini_detector_returns_true_for_invoice():
+    from invoicer.adapters.gemini_detector import GeminiInvoiceDetector, InvoiceCheck
 
     llm = _FakeLLM(InvoiceCheck(is_invoice=True, reason="naglowek FAKTURA, NIP, pozycje"))
-    assert ClaudeInvoiceDetector(llm=llm).is_invoice(_doc()) is True
+    assert GeminiInvoiceDetector(llm=llm).is_invoice(_doc()) is True
 
 
-def test_claude_detector_returns_false_for_non_invoice():
-    from invoicer.adapters.claude_detector import ClaudeInvoiceDetector, InvoiceCheck
+def test_gemini_detector_returns_false_for_non_invoice():
+    from invoicer.adapters.gemini_detector import GeminiInvoiceDetector, InvoiceCheck
 
     llm = _FakeLLM(InvoiceCheck(is_invoice=False, reason="to CV, nie faktura"))
-    assert ClaudeInvoiceDetector(llm=llm).is_invoice(_doc()) is False
+    assert GeminiInvoiceDetector(llm=llm).is_invoice(_doc()) is False
 
 
-def test_claude_detector_satisfies_protocol():
-    from invoicer.adapters.claude_detector import ClaudeInvoiceDetector
+def test_gemini_detector_satisfies_protocol():
+    from invoicer.adapters.gemini_detector import GeminiInvoiceDetector
 
-    assert isinstance(ClaudeInvoiceDetector(llm=_FakeLLM(None)), InvoiceDetector)
+    assert isinstance(GeminiInvoiceDetector(llm=_FakeLLM(None)), InvoiceDetector)
 
 
 def test_detection_message_has_text_and_pdf_block():
-    from invoicer.adapters.claude_detector import build_detection_message
+    from invoicer.adapters.gemini_detector import build_detection_message
 
     blocks = build_detection_message(_doc()).content
     assert blocks[0]["type"] == "text"

@@ -4,22 +4,22 @@ from pathlib import Path
 
 import pytest
 
-from invoicer.adapters.claude_detector import ClaudeInvoiceDetector
+from invoicer.adapters.gemini_detector import GeminiInvoiceDetector
 from invoicer.models import InvoiceDocument
 from invoicer.observability import LlmMetrics, LlmMetricsCallback
 
 _FIXTURE = Path(__file__).parent / "fixtures" / "sample_invoice.pdf"
 
 pytestmark = pytest.mark.skipif(
-    not os.getenv("ANTHROPIC_API_KEY") or not _FIXTURE.exists(),
-    reason="wymaga ANTHROPIC_API_KEY oraz tests/live/fixtures/sample_invoice.pdf (test live)",
+    not os.getenv("GOOGLE_API_KEY") or not _FIXTURE.exists(),
+    reason="wymaga GOOGLE_API_KEY oraz tests/live/fixtures/sample_invoice.pdf (test live)",
 )
 
 
 def test_metrics_captured_on_real_detection():
     metrics = LlmMetrics()
-    cb = LlmMetricsCallback(metrics, model="claude-sonnet-4-6")
-    detector = ClaudeInvoiceDetector(callbacks=[cb])
+    cb = LlmMetricsCallback(metrics, model="gemini-2.5-flash")
+    detector = GeminiInvoiceDetector(callbacks=[cb])
     doc = InvoiceDocument(
         sender="a@b.pl",
         received_at=datetime(2026, 6, 23),
@@ -29,7 +29,7 @@ def test_metrics_captured_on_real_detection():
     detector.is_invoice(doc)
     assert metrics.calls, "callback nie zarejestrowal zadnego wywolania"
     call = metrics.calls[0]
-    assert call.model == "claude-sonnet-4-6"
+    assert call.model == "gemini-2.5-flash"
     assert call.input_tokens > 0
     assert call.output_tokens > 0
     assert call.cost_usd > 0

@@ -105,5 +105,5 @@ def render_report(
         f"- Treatment accuracy **without RAG**: **{without_rag['accuracy']:.2f}**\n"
         f"- Ablation delta (with − without): **{delta:+.2f}**\n"
         f"- Faithfulness (cytaty potwierdzone w zrodle): **{with_rag['faithfulness']:.2f}**\n\n"
-        "_Wygenerowane przez `scripts/run_evals.py` (Voyage + pgvector + Claude)._\n"
+        "_Wygenerowane przez `scripts/run_evals.py` (Voyage + pgvector + Gemini)._\n"
     )

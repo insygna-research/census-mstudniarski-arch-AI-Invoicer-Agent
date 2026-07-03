@@ -52,7 +52,7 @@ def test_render_report_includes_all_metrics_and_ablation_delta():
         retrieval={"k": 5, "n": 30, "recall_at_k": 0.97, "mrr": 0.81},
         with_rag={"n": 30, "accuracy": 0.93, "faithfulness": 0.9},
         without_rag={"n": 30, "accuracy": 0.7},
-        setup="pgvector · voyage-3-large · rerank-2.5 · claude-sonnet-4-6",
+        setup="pgvector · voyage-3-large · rerank-2.5 · gemini-2.5-flash",
     )
     assert "Recall@5: **0.97**" in report
     assert "MRR: **0.81**" in report

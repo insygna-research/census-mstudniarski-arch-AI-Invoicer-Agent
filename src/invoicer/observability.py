@@ -10,13 +10,13 @@ from langchain_core.callbacks import BaseCallbackHandler
 
 _METRICS_LOGGER = "invoicer.metrics"
 
-# Stawki USD za 1M tokenow. Zrodlo: referencja claude-api (cache 2026-06-04).
-# Przyblizone i konfigurowalne — latwo zaktualizowac/rozszerzyc. To nie jest billing Anthropic.
+# Stawki USD za 1M tokenow wg cennika platnego tieru Gemini API (ai.google.dev, 2026-07-02).
+# Na darmowym tierze AI Studio realny koszt to $0 — liczymy stawki platne jako koszt-ekwiwalent.
+# Przyblizone i konfigurowalne — latwo zaktualizowac/rozszerzyc. To nie jest billing Google.
 _PRICING: dict[str, tuple[float, float]] = {
     # model: (input_usd_per_mtok, output_usd_per_mtok)
-    "claude-sonnet-4-6": (3.0, 15.0),  # model domyslny adapterow
-    "claude-opus-4-8": (5.0, 25.0),
-    "claude-haiku-4-5": (1.0, 5.0),
+    "gemini-2.5-flash": (0.30, 2.50),  # model domyslny adapterow
+    "gemini-2.5-flash-lite": (0.10, 0.40),
 }
 
 

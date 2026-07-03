@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from invoicer.app import AppSettings, create_app, preflight_env
 
 _FULL_ENV = {
-    "ANTHROPIC_API_KEY": "sk-test",
+    "GOOGLE_API_KEY": "AIza-test",
     "GMAIL_SENDER_FILTER": "owner@example.com",
     "TWILIO_ACCOUNT_SID": "ACxxxxxxxx",
     "TWILIO_AUTH_TOKEN": "tok",
@@ -75,7 +75,7 @@ def test_preflight_reports_all_missing_core_secrets():
         preflight_env({})
     msg = str(exc.value)
     for key in (
-        "ANTHROPIC_API_KEY",
+        "GOOGLE_API_KEY",
         "GMAIL_SENDER_FILTER",
         "TWILIO_AUTH_TOKEN",
         "APPROVER_WHATSAPP_TO",

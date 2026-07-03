@@ -45,7 +45,7 @@ class AppSettings:
 
 
 _REQUIRED_CORE_ENV = (
-    "ANTHROPIC_API_KEY",  # extractor / reasoner / detector
+    "GOOGLE_API_KEY",  # extractor / reasoner / detector
     "GMAIL_SENDER_FILTER",  # zaciag z Gmaila
     "TWILIO_ACCOUNT_SID",  # kanal akceptacji WhatsApp
     "TWILIO_AUTH_TOKEN",
@@ -85,21 +85,21 @@ def _settings_from_env() -> AppSettings:
     )
 
 
-_METRICS_MODEL = "claude-sonnet-4-6"  # model adapterow Claude (pricing dla LlmMetricsCallback)
+_METRICS_MODEL = "gemini-2.5-flash"  # model adapterow Gemini (pricing dla LlmMetricsCallback)
 
 
-def _real_claude_adapters(metrics: LlmMetrics):
-    """(extractor, reasoner) Claude z LlmMetricsCallback — by /status mial realny koszt."""
-    from invoicer.adapters.claude_extractor import ClaudeVisionExtractor
-    from invoicer.adapters.claude_reasoner import ClaudeExceptionReasoner
+def _real_gemini_adapters(metrics: LlmMetrics):
+    """(extractor, reasoner) Gemini z LlmMetricsCallback — by /status mial realny koszt."""
+    from invoicer.adapters.gemini_extractor import GeminiVisionExtractor
+    from invoicer.adapters.gemini_reasoner import GeminiExceptionReasoner
 
     cb = LlmMetricsCallback(metrics, model=_METRICS_MODEL)
-    return ClaudeVisionExtractor(callbacks=[cb]), ClaudeExceptionReasoner(callbacks=[cb])
+    return GeminiVisionExtractor(callbacks=[cb]), GeminiExceptionReasoner(callbacks=[cb])
 
 
 def _build_real_graph(settings: AppSettings, checkpointer, metrics: LlmMetrics):
-    """Realne adaptery: Claude (z metrykami) + Fakturownia/MockSubiekt + ledger na wolumenie."""
-    extractor, reasoner = _real_claude_adapters(metrics)
+    """Realne adaptery: Gemini (z metrykami) + Fakturownia/MockSubiekt + ledger na wolumenie."""
+    extractor, reasoner = _real_gemini_adapters(metrics)
 
     def _mark_email_read(message_id: str) -> None:
         # Po zaksiegowaniu: oznacz zrodlowy mail jako przeczytany. Swiezy serwis z tokenu
@@ -200,7 +200,7 @@ def create_app(*, settings: AppSettings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def _lifespan(_: FastAPI):
-        from invoicer.adapters.claude_detector import ClaudeInvoiceDetector
+        from invoicer.adapters.gemini_detector import GeminiInvoiceDetector
         from invoicer.adapters.gmail import GmailAdapter
         from invoicer.adapters.gmail_auth import gmail_service_from_token
 
@@ -211,7 +211,7 @@ def create_app(*, settings: AppSettings | None = None) -> FastAPI:
                 channel,
                 registry,
                 GmailAdapter(service, lookback_days=settings.gmail_lookback_days),
-                ClaudeInvoiceDetector(
+                GeminiInvoiceDetector(
                     callbacks=[LlmMetricsCallback(metrics, model=_METRICS_MODEL)]
                 ),
                 sender=settings.gmail_sender,

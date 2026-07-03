@@ -10,8 +10,8 @@ dependencies = [
     "google-auth>=2.55.0",
     "google-auth-oauthlib>=1.4.0",
     "httpx>=0.28.1",
-    "langchain-anthropic>=1.4.6",
     "langchain-core>=1.4.7",
+    "langchain-google-genai>=4.2.6",
     "langgraph>=1.2.5",
     "langgraph-checkpoint-sqlite>=3.1.0",
     "langsmith>=0.8.18",
@@ -57,14 +57,3 @@ files = ["src"]
 check_untyped_defs = true
 warn_unused_ignores = true
 ignore_missing_imports = true
-
-# langchain-anthropic: ChatAnthropic(model=...) jest poprawne w runtime (model to alias
-# pola model_name, validate_by_name=True), ale stuby mypy rozwiazuja pole po nazwie
-# pythonowej i zglaszaja falszywe [call-arg]. Wyciszamy tylko ten kod w adapterach Claude.
-[[tool.mypy.overrides]]
-module = [
-    "invoicer.adapters.claude_extractor",
-    "invoicer.adapters.claude_reasoner",
-    "invoicer.adapters.claude_detector",
-]
-disable_error_code = ["call-arg"]

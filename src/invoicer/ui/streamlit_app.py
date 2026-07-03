@@ -68,14 +68,14 @@ def _foreign(cls) -> bool:
 
 def _step_extract(inv) -> str:
     if not inv:
-        return _card("02", "extract · Claude vision", "idle", "—")
+        return _card("02", "extract · Gemini vision", "idle", "—")
     conf = inv.extraction_confidence
     tail = "" if conf is None else f" · pewnosc {conf:.0%}"
     detail = (
         f"{_esc(inv.number)} · {_esc(inv.seller.name)} ({_esc(inv.seller.country)}) · "
         f"{inv.total_gross} {_esc(inv.currency)}{tail}"
     )
-    return _card("02", "extract · Claude vision", "done", detail)
+    return _card("02", "extract · Gemini vision", "done", detail)
 
 
 def _step_classify(cls) -> str:
@@ -201,7 +201,7 @@ st.markdown(
     '<div class="cp-title">🛰 INVOICER // agentic invoice intake</div>', unsafe_allow_html=True
 )
 st.markdown(
-    '<div class="cp-sub">PDF → Claude vision → walidacja PL → klasyfikacja → '
+    '<div class="cp-sub">PDF → Gemini vision → walidacja PL → klasyfikacja → '
     "legal-grounded RAG → <b>BRAMKA CZLOWIEKA</b> → ksiegowanie</div>",
     unsafe_allow_html=True,
 )

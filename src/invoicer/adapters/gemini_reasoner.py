@@ -9,7 +9,7 @@ from invoicer.rag.models import RetrievedChunk
 from invoicer.rag.query import build_retrieval_query
 from invoicer.reasoning import ClassificationJudgment, judgment_to_classification
 
-_DEFAULT_MODEL = "claude-sonnet-4-6"
+_DEFAULT_MODEL = "gemini-2.5-flash"
 
 REASON_PROMPT = (
     "Jestes ekspertem od polskiego VAT. Faktura pochodzi od sprzedawcy ZAGRANICZNEGO "
@@ -40,10 +40,11 @@ def build_reason_message(
     return HumanMessage(content=body)
 
 
-class ClaudeExceptionReasoner:
-    """ExceptionReasoner oparty o Claude + structured output (ten sam wzorzec co extractor).
+class GeminiExceptionReasoner:
+    """ExceptionReasoner oparty o Gemini + structured output (ten sam wzorzec co extractor).
 
-    LLM wstrzykiwalny (CI: fake-llm); ChatAnthropic tworzony leniwie. Realne API -> test live.
+    LLM wstrzykiwalny (CI: fake-llm); ChatGoogleGenerativeAI tworzony leniwie.
+    Realne API -> test live.
     """
 
     def __init__(
@@ -55,9 +56,9 @@ class ClaudeExceptionReasoner:
 
     def _client(self):
         if self._llm is None:
-            from langchain_anthropic import ChatAnthropic
+            from langchain_google_genai import ChatGoogleGenerativeAI
 
-            self._llm = ChatAnthropic(model=self._model, callbacks=self._callbacks)
+            self._llm = ChatGoogleGenerativeAI(model=self._model, callbacks=self._callbacks)
         return self._llm
 
     def reason(

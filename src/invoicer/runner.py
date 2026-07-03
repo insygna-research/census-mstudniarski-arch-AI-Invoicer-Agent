@@ -97,7 +97,7 @@ def document_from_upload(
 
 
 def _demo_invoice() -> Invoice:
-    """Przykladowa faktura PL do trybu offline (gdy brak ANTHROPIC_API_KEY)."""
+    """Przykladowa faktura PL do trybu offline (gdy brak GOOGLE_API_KEY)."""
     line = LineItem(
         description="Usluga programistyczna (DEMO offline)",
         quantity=Decimal("1"),
@@ -171,13 +171,13 @@ def build_sink():
 
 
 def build_demo_graph(*, ledger_path: Path):
-    """Buduje graf demo: realny Claude gdy ANTHROPIC_API_KEY, inaczej offline (stub)."""
-    if os.getenv("ANTHROPIC_API_KEY"):
-        from invoicer.adapters.claude_extractor import ClaudeVisionExtractor
-        from invoicer.adapters.claude_reasoner import ClaudeExceptionReasoner
+    """Buduje graf demo: realny Gemini gdy GOOGLE_API_KEY, inaczej offline (stub)."""
+    if os.getenv("GOOGLE_API_KEY"):
+        from invoicer.adapters.gemini_extractor import GeminiVisionExtractor
+        from invoicer.adapters.gemini_reasoner import GeminiExceptionReasoner
 
-        extractor: InvoiceExtractor = ClaudeVisionExtractor()
-        reasoner: ExceptionReasoner = ClaudeExceptionReasoner()
+        extractor: InvoiceExtractor = GeminiVisionExtractor()
+        reasoner: ExceptionReasoner = GeminiExceptionReasoner()
     else:
         extractor = StubExtractor(_demo_invoice())
         reasoner = IdentityReasoner()

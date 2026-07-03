@@ -1,9 +1,9 @@
 from datetime import date
 from decimal import Decimal
 
-from invoicer.adapters.claude_reasoner import (
+from invoicer.adapters.gemini_reasoner import (
     REASON_PROMPT,
-    ClaudeExceptionReasoner,
+    GeminiExceptionReasoner,
     build_reason_message,
 )
 from invoicer.models import (
@@ -92,8 +92,8 @@ def _base() -> Classification:
     )
 
 
-def test_claude_reasoner_satisfies_protocol():
-    assert isinstance(ClaudeExceptionReasoner(llm=_FakeLLM(None)), ExceptionReasoner)
+def test_gemini_reasoner_satisfies_protocol():
+    assert isinstance(GeminiExceptionReasoner(llm=_FakeLLM(None)), ExceptionReasoner)
 
 
 def test_reason_merges_judgment_with_deterministic_bucket():
@@ -105,7 +105,7 @@ def test_reason_merges_judgment_with_deterministic_bucket():
         currency_note="GBP -> NBP",
     )
     llm = _FakeLLM(judgment)
-    out = ClaudeExceptionReasoner(llm=llm).reason(_foreign_invoice(), _base())
+    out = GeminiExceptionReasoner(llm=llm).reason(_foreign_invoice(), _base())
     assert out.treatment == TaxTreatment.IMPORT_USLUG
     assert out.country_bucket == CountryBucket.POZA_UE  # zachowany z base (deterministyczny)
     assert out.confidence == 0.85
@@ -115,8 +115,8 @@ def test_reason_merges_judgment_with_deterministic_bucket():
 
 
 def test_default_construction_does_not_raise():
-    reasoner = ClaudeExceptionReasoner()
-    assert reasoner._model == "claude-sonnet-4-6"
+    reasoner = GeminiExceptionReasoner()
+    assert reasoner._model == "gemini-2.5-flash"
 
 
 def _ctx():
@@ -161,7 +161,7 @@ def test_reason_threads_citations_through():
             )
         ],
     )
-    out = ClaudeExceptionReasoner(llm=_FakeLLM(judgment)).reason(
+    out = GeminiExceptionReasoner(llm=_FakeLLM(judgment)).reason(
         _foreign_invoice(), _base(), _ctx()
     )
     assert out.citations[0].article_ref == "art. 28b ust. 1"

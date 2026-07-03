@@ -4,9 +4,9 @@
 
 > Agentic AI assistant that pulls invoices from a mailbox, extracts and validates them under **Polish tax law**, reasons about edge cases (e.g. a UK invoice with no VAT) grounded in the actual statute, and books them to accounting software — **only after a human approves over WhatsApp**.
 
-Built with **LangGraph** + **Claude** (vision + structured output) in a clean ports-and-adapters architecture, test-driven throughout, and running 24/7 on Fly.io.
+Built with **LangGraph** + **Gemini** (vision + structured output) in a clean ports-and-adapters architecture, test-driven throughout, and running 24/7 on Fly.io.
 
-> **Status:** live end-to-end. Real **Gmail** intake → **Claude** extraction → legal-grounded **corrective RAG** (pgvector + Voyage) → **human approval over WhatsApp** → booking to **Fakturownia** (real REST) + a hash-chained audit ledger. `MockSubiektSink` remains behind the same port for offline/demo (the real Subiekt GT API needs Windows + COM). Portfolio project — not a certified tax tool; every booking is human-gated.
+> **Status:** live end-to-end. Real **Gmail** intake → **Gemini** extraction → legal-grounded **corrective RAG** (pgvector + Voyage) → **human approval over WhatsApp** → booking to **Fakturownia** (real REST) + a hash-chained audit ledger. `MockSubiektSink` remains behind the same port for offline/demo (the real Subiekt GT API needs Windows + COM). Portfolio project — not a certified tax tool; every booking is human-gated.
 
 ---
 
@@ -14,7 +14,7 @@ Built with **LangGraph** + **Claude** (vision + structured output) in a clean po
 
 ```mermaid
 flowchart LR
-    A["intake<br/>(Gmail poll · is:unread)"] --> B["extract<br/>(Claude vision)"]
+    A["intake<br/>(Gmail poll · is:unread)"] --> B["extract<br/>(Gemini vision)"]
     B --> C["validate<br/>(NIP · sums · duplicate)"]
     C --> D{classify}
     D -->|domestic PL| F["human_review<br/>(interrupt)"]
@@ -27,7 +27,7 @@ flowchart LR
 ```
 
 1. **Intake** — an interval scheduler polls Gmail for **unread** PDF invoices from a configured sender (`is:unread` + a lookback window + document-level dedup).
-2. **Extract** — Claude vision reads the PDF/scan into a structured `Invoice` (amounts as `Decimal`, dates parsed) via `with_structured_output`.
+2. **Extract** — Gemini vision reads the PDF/scan into a structured `Invoice` (amounts as `Decimal`, dates parsed) via `with_structured_output`.
 3. **Validate** — deterministic checks: Polish NIP checksum, `net + VAT = gross` (per line **and** globally, so cancelling errors can't hide), duplicate detection against the append-only ledger.
 4. **Classify** — domestic PL vs foreign (EU / non-EU) tax bucket, from the seller's country.
 5. **Reason (foreign only)** — legal-grounded corrective RAG proposes the correct treatment (e.g. UK SaaS → *import of services / reverse charge*) **with a cited legal basis**, then a faithfulness check verifies each citation and **abstains** when grounding is weak.
@@ -39,7 +39,7 @@ flowchart LR
 - **Knows when *not* to be autonomous.** A mostly-deterministic LangGraph workflow with LLM "islands" (extraction, exception reasoning) and a hard human gate before any booking — a deliberate, mature agent design rather than an unbounded autonomous loop. (It is a hand-authored DAG with routing, not a ReAct tool-calling agent — by design.)
 - **Real Polish-tax substance.** NIP checksum, `net+VAT=gross` reconciliation, reverse-charge / import-of-services / WNT reasoning for foreign invoices, and cost-invoice specifics that match how Fakturownia actually renders documents.
 - **Security-first.** Prompt-injection defense (the document rides as a separate *data* block, never as instructions; structured output; the human gate authorizes the only side effect). The exception-reasoning step receives **only an allow-listed summary** — no buyer PII or addresses leave the process. PII is redacted from logs.
-- **CI-testable LLM integration.** Every external dependency is injected behind a port, so the whole pipeline (including the `interrupt`/resume HITL flow and the RAG sub-flow) runs deterministically against fakes in CI; the real Anthropic / Voyage / pgvector / Gmail / Fakturownia paths are exercised by **live-gated** tests that skip without credentials.
+- **CI-testable LLM integration.** Every external dependency is injected behind a port, so the whole pipeline (including the `interrupt`/resume HITL flow and the RAG sub-flow) runs deterministically against fakes in CI; the real Gemini / Voyage / pgvector / Gmail / Fakturownia paths are exercised by **live-gated** tests that skip without credentials.
 
 ### Legal-grounded corrective RAG
 
@@ -55,9 +55,9 @@ Ports-and-adapters around a LangGraph state machine — the core depends only on
 | Port | Mock / offline adapter | Real adapter |
 |------|------------------------|--------------|
 | `EmailSource` | `FixtureSource` / upload | **`GmailAdapter`** ✅ (Gmail API, `gmail.modify`) |
-| `InvoiceDetector` | `StubInvoiceDetector` | **`ClaudeInvoiceDetector`** ✅ |
-| `InvoiceExtractor` | `StubExtractor` | **`ClaudeVisionExtractor`** ✅ (`claude-sonnet-4-6`) |
-| `ExceptionReasoner` | `IdentityReasoner` / `StubExceptionReasoner` | **`ClaudeExceptionReasoner`** ✅ |
+| `InvoiceDetector` | `StubInvoiceDetector` | **`GeminiInvoiceDetector`** ✅ |
+| `InvoiceExtractor` | `StubExtractor` | **`GeminiVisionExtractor`** ✅ (`gemini-2.5-flash`) |
+| `ExceptionReasoner` | `IdentityReasoner` / `StubExceptionReasoner` | **`GeminiExceptionReasoner`** ✅ |
 | `AccountingSink` | `MockSubiektSink` (offline/demo) | **`FakturowniaSink`** ✅ (REST, cost invoice) |
 | `ApprovalChannel` | `StubApprovalChannel` / CLI | **`TwilioWhatsAppChannel`** ✅ (+ signed tap-to-approve links) |
 | `Embedder` | `DeterministicEmbedder` (CI) | **`VoyageEmbedder`** ✅ (`voyage-3-large`) |
@@ -67,7 +67,7 @@ Ports-and-adapters around a LangGraph state machine — the core depends only on
 The graph is assembled in `src/invoicer/graph/build.py` from eight nodes — `extract → validate → classify → (retrieve_legal_context → reason_exception → verify_grounding) → human_review → book` — with three routers (`route_after_validate`, `route_after_classify`, `route_after_review`). Swapping any adapter is a constructor argument; the graph, state, and nodes are untouched:
 
 ```python
-build_invoice_graph(extractor=ClaudeVisionExtractor(), reasoner=ClaudeExceptionReasoner(), sink=build_sink(), ...)
+build_invoice_graph(extractor=GeminiVisionExtractor(), reasoner=GeminiExceptionReasoner(), sink=build_sink(), ...)
 ```
 
 ### Two-phase human-in-the-loop
@@ -88,7 +88,7 @@ intake → extract → validate → classify?
        ├─ PL ──────────────────────────────────────────────► human gate   (RAG skipped)
        └─ foreign (EU or non-EU)
             → retrieve_legal_context   query (PII allow-list) → pgvector cosine → Voyage rerank → top-5
-            → reason_exception         Claude grounded → treatment + citations (articles)
+            → reason_exception         Gemini grounded → treatment + citations (articles)
             → verify_grounding         each citation ⊆ source? → grounded / unsupported (weak if no law)
             → human gate
   human gate?  Approve → book (Fakturownia, income=0) + hash-chained ledger + mark-read
@@ -123,7 +123,7 @@ intake → extract → validate → classify?
 
 Two complementary dedup layers plus a tamper-evident ledger:
 
-- **`ProcessedDocuments`** (SQLite, key `message_id:filename`) — stops re-processing the **same email** (avoids duplicate Claude cost + WhatsApp spam). At-most-once: a failure marks the doc so it isn't retried.
+- **`ProcessedDocuments`** (SQLite, key `message_id:filename`) — stops re-processing the **same email** (avoids duplicate Gemini cost + WhatsApp spam). At-most-once: a failure marks the doc so it isn't retried.
 - **Ledger** (`ledger.py`, append-only JSONL, key `number + NIP`) — stops **double-booking the same invoice**, even when it arrives from different emails. Checked in `validate` (early-exit) and again in `book` (defense-in-depth).
 - **Hash chain** — each ledger entry carries `prev_hash` + `entry_hash` (SHA-256 of the financial core), so `verify_chain()` detects manual tampering of the audit log.
 
@@ -136,7 +136,7 @@ Two complementary dedup layers plus a tamper-evident ledger:
 
 ## Tech stack
 
-Python 3.12 · [uv](https://github.com/astral-sh/uv) · **LangGraph** (state graph, `interrupt`, SQLite checkpointer) · **langchain-anthropic** (`ChatAnthropic`, `with_structured_output`, multimodal) · **Voyage AI** (embeddings + rerank) · **pgvector** / **psycopg** (Postgres) · **FastAPI** + **APScheduler** (webhook + interval intake) · **google-api-python-client** (Gmail) · **Twilio** (WhatsApp, via httpx) · **Sentry** · **LangSmith** · Pydantic v2 · pytest · ruff.
+Python 3.12 · [uv](https://github.com/astral-sh/uv) · **LangGraph** (state graph, `interrupt`, SQLite checkpointer) · **langchain-google-genai** (`ChatGoogleGenerativeAI`, `with_structured_output`, multimodal) · **Voyage AI** (embeddings + rerank) · **pgvector** / **psycopg** (Postgres) · **FastAPI** + **APScheduler** (webhook + interval intake) · **google-api-python-client** (Gmail) · **Twilio** (WhatsApp, via httpx) · **Sentry** · **LangSmith** · Pydantic v2 · pytest · ruff.
 
 ## How it was built
 
@@ -170,7 +170,7 @@ uv run --group demo streamlit run src/invoicer/ui/streamlit_app.py
 ```bash
 docker run -e POSTGRES_PASSWORD=x -p 5432:5432 pgvector/pgvector:pg16
 export DATABASE_URL=postgresql://postgres:x@localhost:5432/postgres
-export VOYAGE_API_KEY=... ANTHROPIC_API_KEY=...
+export VOYAGE_API_KEY=... GOOGLE_API_KEY=...
 
 PYTHONPATH=src uv run python scripts/ingest_legal_corpus.py    # ingest Polish-VAT corpus (idempotent)
 PYTHONPATH=.:src uv run python scripts/run_evals.py            # writes docs/evals/legal-rag-report.md
@@ -195,7 +195,7 @@ PYTHONPATH=src uv run python scripts/run_flow_now.py fv.pdf     # or a single lo
 | `INVOICER_SINK` | – | `fakturownia` for the real sink; else `MockSubiektSink` |
 | `FAKTUROWNIA_API_TOKEN` / `FAKTUROWNIA_DOMAIN` | if sink=fakturownia | Fakturownia REST credentials |
 | `FAKTUROWNIA_DEPARTMENT_ID` | optional | existing department id (our company) → sent instead of `seller_*` |
-| `ANTHROPIC_API_KEY` | for real LLM | Claude extraction / reasoning / detection |
+| `GOOGLE_API_KEY` | for real LLM | Gemini extraction / reasoning / detection |
 | `DATABASE_URL` | for real RAG | pgvector Postgres (requires `VOYAGE_API_KEY`) |
 | `VOYAGE_API_KEY` | with DATABASE_URL | Voyage embeddings + rerank |
 | `GMAIL_TOKEN_B64` | headless deploy | base64 of `token.json`, restored to `/data/token.json` on boot (only if absent) |
@@ -236,7 +236,7 @@ fly volumes create invoicer_data --region ams --size 1
 fly postgres create --name invoicer-db --region ams && fly postgres attach invoicer-db
 
 fly secrets set \
-  ANTHROPIC_API_KEY="..." \
+  GOOGLE_API_KEY="..." \
   TWILIO_ACCOUNT_SID="AC..." TWILIO_AUTH_TOKEN="..." \
   TWILIO_WHATSAPP_FROM="whatsapp:+14155238886" APPROVER_WHATSAPP_TO="whatsapp:+48..." \
   FAKTUROWNIA_API_TOKEN="..." FAKTUROWNIA_DOMAIN="mstudniarski" FAKTUROWNIA_DEPARTMENT_ID="..." \
@@ -262,14 +262,14 @@ Manual deploy: `fly deploy --remote-only -a <app>`.
 
 ## Testing
 
-- **352 unit/integration tests + 10 live-gated** — TDD throughout (failing test → minimal implementation → commit).
+- **351 unit/integration tests + 10 live-gated** — TDD throughout (failing test → minimal implementation → commit).
 - The full pipeline (real `interrupt`/resume HITL and the corrective-RAG sub-flow) runs deterministically in CI via injected fakes.
-- Live tests hitting real Anthropic / Voyage / pgvector / Fakturownia / Gmail are gated behind their env vars and skip otherwise.
+- Live tests hitting real Gemini / Voyage / pgvector / Fakturownia / Gmail are gated behind their env vars and skip otherwise.
 - **Evals** — retrieval (recall@5 / MRR) over a 30-case golden dataset in [`docs/evals/legal-rag-report.md`](docs/evals/legal-rag-report.md); grounded-classification accuracy (with/without-RAG ablation) + citation faithfulness are wired in `scripts/run_evals.py`.
 - **CI gates** — `ruff check` · `ruff format --check` · **`mypy`** (typed, 0 errors) · tests with **coverage ≥ 84%** (`--cov-fail-under`) · `pip-audit`.
 
 ```bash
-uv run pytest -q --cov=invoicer   # 352 passed, 10 skipped; coverage gated in CI (fail-under 84%)
+uv run pytest -q --cov=invoicer   # 351 passed, 10 skipped; coverage gated in CI (fail-under 84%)
 uv run ruff check .
 uv run mypy
 ```
@@ -290,7 +290,7 @@ uv run mypy
 ```
 src/invoicer/
   graph/          build.py (StateGraph) · nodes.py (8 nodes + routers)
-  adapters/       gmail · claude_* · fakturownia · mock_subiekt · twilio_whatsapp · voyage_* · pgvector_store · stubs
+  adapters/       gmail · gemini_* · fakturownia · mock_subiekt · twilio_whatsapp · voyage_* · pgvector_store · stubs
   rag/            corpus · query · ingest · eval
   ui/             streamlit_app.py
   ports.py state.py models.py extraction.py validation.py booking.py ledger.py processed.py
@@ -307,7 +307,7 @@ Dockerfile · fly.toml · pyproject.toml
 - [x] Domain models + Polish-tax validation (NIP, sums, duplicates)
 - [x] Ports & hash-chained ledger with duplicate detection
 - [x] LangGraph graph + human-in-the-loop (`interrupt`/resume)
-- [x] Real Claude vision extraction + LLM exception reasoning
+- [x] Real Gemini vision extraction + LLM exception reasoning
 - [x] Legal-grounded corrective RAG (pgvector + Voyage, faithfulness + abstention)
 - [x] Real Gmail connector (`gmail.modify`) + mark-read after booking
 - [x] Real Fakturownia sink (cost invoice: number · payment_to · seller/buyer swap · department_id)

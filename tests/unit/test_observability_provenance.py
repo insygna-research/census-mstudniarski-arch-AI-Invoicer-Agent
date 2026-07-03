@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from invoicer.app import _METRICS_MODEL, _real_claude_adapters
+from invoicer.app import _METRICS_MODEL, _real_gemini_adapters
 from invoicer.ledger import Ledger, LedgerEntry
 from invoicer.observability import LlmMetrics, LlmMetricsCallback
 from invoicer.observability_status import PipelineCounters, pipeline_status
@@ -67,13 +67,13 @@ def test_old_entry_without_provenance_still_verifies(tmp_path):
     assert ledger.verify_chain() is True
 
 
-def test_real_claude_adapters_get_metrics_callback():
+def test_real_gemini_adapters_get_metrics_callback():
     # Krytyczny fix: prod FAKTYCZNIE podpina LlmMetricsCallback (wczesniej /status zawsze $0).
     metrics = LlmMetrics()
-    extractor, reasoner = _real_claude_adapters(metrics)
+    extractor, reasoner = _real_gemini_adapters(metrics)
     assert any(isinstance(cb, LlmMetricsCallback) for cb in extractor._callbacks)
     assert any(isinstance(cb, LlmMetricsCallback) for cb in reasoner._callbacks)
-    assert _METRICS_MODEL == "claude-sonnet-4-6"
+    assert _METRICS_MODEL == "gemini-2.5-flash"
 
 
 def test_run_config_tags_thread_id():

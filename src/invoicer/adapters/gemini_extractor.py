@@ -8,7 +8,7 @@ from langchain_core.messages import HumanMessage
 from invoicer.extraction import InvoiceExtraction, extraction_to_invoice
 from invoicer.models import Invoice, InvoiceDocument
 
-_DEFAULT_MODEL = "claude-sonnet-4-6"
+_DEFAULT_MODEL = "gemini-2.5-flash"
 
 EXTRACTION_PROMPT = (
     "Jestes asystentem ksiegowym. Wyciagnij dane z zalaczonej faktury i wypelnij "
@@ -44,11 +44,11 @@ def build_extraction_message(document: InvoiceDocument) -> HumanMessage:
     )
 
 
-class ClaudeVisionExtractor:
-    """InvoiceExtractor oparty o Claude (vision) + structured output.
+class GeminiVisionExtractor:
+    """InvoiceExtractor oparty o Gemini (vision) + structured output.
 
     LLM jest wstrzykiwalny (testy/CI uzywaja fake-llm); domyslnie tworzony leniwie
-    jako ChatAnthropic(model). Realne wywolanie API pokrywa test live-gated.
+    jako ChatGoogleGenerativeAI(model). Realne wywolanie API pokrywa test live-gated.
     """
 
     def __init__(
@@ -60,9 +60,9 @@ class ClaudeVisionExtractor:
 
     def _client(self):
         if self._llm is None:
-            from langchain_anthropic import ChatAnthropic
+            from langchain_google_genai import ChatGoogleGenerativeAI
 
-            self._llm = ChatAnthropic(model=self._model, callbacks=self._callbacks)
+            self._llm = ChatGoogleGenerativeAI(model=self._model, callbacks=self._callbacks)
         return self._llm
 
     def extract(self, document: InvoiceDocument) -> Invoice:

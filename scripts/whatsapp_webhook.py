@@ -27,8 +27,8 @@ from pathlib import Path
 
 import uvicorn
 
-from invoicer.adapters.claude_extractor import ClaudeVisionExtractor
-from invoicer.adapters.claude_reasoner import ClaudeExceptionReasoner
+from invoicer.adapters.gemini_extractor import GeminiVisionExtractor
+from invoicer.adapters.gemini_reasoner import GeminiExceptionReasoner
 from invoicer.adapters.mock_subiekt import MockSubiektSink
 from invoicer.approvals import PendingApprovals
 from invoicer.graph.build import build_invoice_graph
@@ -53,10 +53,10 @@ def _sink():
 def main() -> None:
     install_redaction(logging.getLogger("invoicer"))  # logi invoicer.* z redakcja PII
     # extractor/reasoner sa leniwe i NIE sa wolane przy resume (po human_review leci tylko `book`),
-    # wiec klucz ANTHROPIC_API_KEY nie jest tu potrzebny — graf musi tylko miec te sama strukture.
+    # wiec klucz GOOGLE_API_KEY nie jest tu potrzebny — graf musi tylko miec te sama strukture.
     graph = build_invoice_graph(
-        extractor=ClaudeVisionExtractor(),
-        reasoner=ClaudeExceptionReasoner(),
+        extractor=GeminiVisionExtractor(),
+        reasoner=GeminiExceptionReasoner(),
         ledger=Ledger(Path("ledger.jsonl")),
         sink=_sink(),
         checkpointer=persistent_checkpointer(_DB),

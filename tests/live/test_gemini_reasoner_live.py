@@ -4,11 +4,11 @@ from decimal import Decimal
 
 import pytest
 
-from invoicer.adapters.claude_reasoner import ClaudeExceptionReasoner
+from invoicer.adapters.gemini_reasoner import GeminiExceptionReasoner
 from invoicer.models import Classification, CountryBucket, Invoice, LineItem, Party, TaxTreatment
 
 pytestmark = pytest.mark.skipif(
-    not os.getenv("ANTHROPIC_API_KEY"), reason="wymaga ANTHROPIC_API_KEY (test live)"
+    not os.getenv("GOOGLE_API_KEY"), reason="wymaga GOOGLE_API_KEY (test live)"
 )
 
 
@@ -39,7 +39,7 @@ def test_real_judge_classifies_uk_saas_as_import_uslug():
     base = Classification(
         treatment=TaxTreatment.IMPORT_USLUG, country_bucket=CountryBucket.POZA_UE, confidence=0.6
     )
-    out = ClaudeExceptionReasoner().reason(_uk_saas_invoice(), base)
+    out = GeminiExceptionReasoner().reason(_uk_saas_invoice(), base)
     assert out.country_bucket == CountryBucket.POZA_UE
     assert out.treatment == TaxTreatment.IMPORT_USLUG  # SaaS = usluga
     assert out.rationale_pl  # niepuste uzasadnienie

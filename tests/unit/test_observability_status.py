@@ -14,7 +14,7 @@ class _FakeRegistry:
 
 def test_pipeline_status_combines_llm_totals_counters_and_pending():
     metrics = LlmMetrics()
-    metrics.record(LlmCall("claude-sonnet-4-6", 100, 20, 0.0006, 500))
+    metrics.record(LlmCall("gemini-2.5-flash", 100, 20, 0.0006, 500))
     counters = PipelineCounters(processed=3, failed=1)
     registry = _FakeRegistry(pending=2)
 

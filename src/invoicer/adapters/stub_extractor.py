@@ -7,7 +7,7 @@ class StubExtractor:
     """Deterministyczny InvoiceExtractor do testow/demo offline.
 
     Zwraca z gory ustalona Invoice (niezalezna kopie), bez kontaktu z LLM.
-    Realny ClaudeVisionExtractor dochodzi w Planie 04.
+    Realny GeminiVisionExtractor dochodzi w Planie 04.
     """
 
     def __init__(self, invoice: Invoice) -> None:

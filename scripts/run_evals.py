@@ -1,11 +1,11 @@
 """Live eval harness dla legal-grounded RAG.
 
-Wymaga VOYAGE_API_KEY + DATABASE_URL + ANTHROPIC_API_KEY.
+Wymaga VOYAGE_API_KEY + DATABASE_URL + GOOGLE_API_KEY.
 
-Uruchom: PYTHONPATH=.:src VOYAGE_API_KEY=... DATABASE_URL=... ANTHROPIC_API_KEY=... \
+Uruchom: PYTHONPATH=.:src VOYAGE_API_KEY=... DATABASE_URL=... GOOGLE_API_KEY=... \
     uv run python scripts/run_evals.py
 Zaklada zindeksowany korpus (scripts/ingest_legal_corpus.py).
-Koszt: ~60 wywolan Claude (30 przypadkow x with/without RAG) + retrieval Voyage.
+Koszt: ~60 wywolan Gemini (30 przypadkow x with/without RAG) + retrieval Voyage.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
-from invoicer.adapters.claude_reasoner import ClaudeExceptionReasoner
+from invoicer.adapters.gemini_reasoner import GeminiExceptionReasoner
 from invoicer.adapters.pgvector_store import PgVectorLegalStore
 from invoicer.adapters.voyage_embedder import VoyageEmbedder
 from invoicer.adapters.voyage_reranker import VoyageReranker
@@ -32,7 +32,7 @@ from invoicer.rag.query import build_retrieval_query
 
 _CASES = Path(__file__).resolve().parents[1] / "data" / "evals" / "legal_cases.jsonl"
 _REPORT = Path(__file__).resolve().parents[1] / "docs" / "evals" / "legal-rag-report.md"
-_SETUP = "pgvector · voyage-3-large · rerank-2.5 · claude-sonnet-4-6"
+_SETUP = "pgvector · voyage-3-large · rerank-2.5 · gemini-2.5-flash"
 
 
 def _store() -> PgVectorLegalStore:
@@ -67,7 +67,7 @@ def evaluate_retrieval(k: int = 5) -> dict:
 def evaluate_reasoning(*, with_rag: bool, k: int = 5) -> dict:
     """Accuracy traktowania vs golden; przy with_rag dodatkowo faithfulness cytatow."""
     store = _store() if with_rag else None
-    reasoner = ClaudeExceptionReasoner()
+    reasoner = GeminiExceptionReasoner()
     cases = load_cases(_CASES)
     hits, faiths = [], []
     for case in cases:

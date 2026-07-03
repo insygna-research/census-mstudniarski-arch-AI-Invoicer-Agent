@@ -4,9 +4,9 @@ from decimal import Decimal
 
 import pytest
 
-from invoicer.adapters.claude_extractor import (
+from invoicer.adapters.gemini_extractor import (
     EXTRACTION_PROMPT,
-    ClaudeVisionExtractor,
+    GeminiVisionExtractor,
     build_extraction_message,
 )
 from invoicer.extraction import InvoiceExtraction, LineItemExtraction, PartyExtraction
@@ -109,13 +109,13 @@ class _FakeLLM:
         return self.structured
 
 
-def test_claude_extractor_satisfies_protocol():
-    assert isinstance(ClaudeVisionExtractor(llm=_FakeLLM(None)), InvoiceExtractor)
+def test_gemini_extractor_satisfies_protocol():
+    assert isinstance(GeminiVisionExtractor(llm=_FakeLLM(None)), InvoiceExtractor)
 
 
 def test_extract_uses_structured_output_and_maps_to_invoice():
     llm = _FakeLLM(_extraction())
-    inv = ClaudeVisionExtractor(llm=llm).extract(_doc("faktura.pdf"))
+    inv = GeminiVisionExtractor(llm=llm).extract(_doc("faktura.pdf"))
     assert isinstance(inv, Invoice)
     assert inv.number == "FV/1"
     assert inv.total_gross == Decimal("1230.00")
@@ -127,6 +127,6 @@ def test_extract_uses_structured_output_and_maps_to_invoice():
 
 
 def test_default_construction_does_not_raise():
-    # bez llm i bez klucza API konstrukcja musi sie udac (ChatAnthropic tworzony leniwie)
-    extractor = ClaudeVisionExtractor()
-    assert extractor._model == "claude-sonnet-4-6"
+    # bez llm i bez klucza API konstrukcja musi sie udac (ChatGoogleGenerativeAI tworzony leniwie)
+    extractor = GeminiVisionExtractor()
+    assert extractor._model == "gemini-2.5-flash"
