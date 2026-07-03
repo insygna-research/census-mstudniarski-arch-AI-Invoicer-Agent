@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from invoicer.adapters.voyage_retry import call_with_rate_limit_retry
+
 _DEFAULT_MODEL = "rerank-2.5"
 
 
@@ -20,5 +22,7 @@ class VoyageReranker:
         return self._client
 
     def rerank(self, query: str, documents: list[str], top_k: int) -> list[tuple[int, float]]:
-        reranked = self._voyage().rerank(query, documents, model=self._model, top_k=top_k)
+        reranked = call_with_rate_limit_retry(
+            lambda: self._voyage().rerank(query, documents, model=self._model, top_k=top_k)
+        )
         return [(r.index, r.relevance_score) for r in reranked.results]

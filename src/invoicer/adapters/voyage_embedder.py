@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from invoicer.adapters.voyage_retry import call_with_rate_limit_retry
+
 _DEFAULT_MODEL = "voyage-3-large"
 
 
@@ -24,7 +26,11 @@ class VoyageEmbedder:
         return self._client
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
-        return self._voyage().embed(texts, model=self._model, input_type="document").embeddings
+        return call_with_rate_limit_retry(
+            lambda: self._voyage().embed(texts, model=self._model, input_type="document")
+        ).embeddings
 
     def embed_query(self, text: str) -> list[float]:
-        return self._voyage().embed([text], model=self._model, input_type="query").embeddings[0]
+        return call_with_rate_limit_retry(
+            lambda: self._voyage().embed([text], model=self._model, input_type="query")
+        ).embeddings[0]
