@@ -10,9 +10,10 @@ Uzycie (invoicer jest pod src/, wiec PYTHONPATH=src):
     PYTHONPATH=src uv run python scripts/whatsapp_approval.py        # tryb Gmail (dzis)
     PYTHONPATH=src uv run python scripts/whatsapp_approval.py fv.pdf  # tryb pliku (test wiringu)
 
-Wymaga env: GOOGLE_API_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN,
-TWILIO_WHATSAPP_FROM, APPROVER_WHATSAPP_TO; w trybie Gmail dodatkowo
-token.json (po authorize_gmail) + GMAIL_SENDER_FILTER.
+Wymaga env: GOOGLE_API_KEY (albo INVOICER_LLM_PROVIDER=ollama — lokalny model,
+bez klucza), TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM,
+APPROVER_WHATSAPP_TO; w trybie Gmail dodatkowo token.json (po authorize_gmail)
++ GMAIL_SENDER_FILTER.
 """
 
 from __future__ import annotations
@@ -22,9 +23,8 @@ import sys
 import uuid
 from pathlib import Path
 
-from invoicer.adapters.gemini_extractor import GeminiVisionExtractor
-from invoicer.adapters.gemini_reasoner import GeminiExceptionReasoner
 from invoicer.adapters.mock_subiekt import MockSubiektSink
+from invoicer.adapters.provider import build_detector, build_extractor, build_reasoner
 from invoicer.adapters.twilio_whatsapp import build_twilio_whatsapp_channel
 from invoicer.approvals import PendingApprovals
 from invoicer.graph.build import build_invoice_graph
@@ -47,20 +47,19 @@ def _documents() -> list[InvoiceDocument]:
         return [document_from_upload(path.name, path.read_bytes())]
 
     # 2) inaczej: pobierz dzisiejsze .pdf z Gmaila i zostaw tylko wykryte jako faktura
-    from invoicer.adapters.gemini_detector import GeminiInvoiceDetector
     from invoicer.adapters.gmail import GmailAdapter
     from invoicer.adapters.gmail_auth import gmail_service_from_token
 
     service = gmail_service_from_token(Path(os.getenv("GMAIL_TOKEN", "token.json")))
     source = GmailAdapter(service)
     sender = os.environ["GMAIL_SENDER_FILTER"]
-    return fetch_invoice_documents(source, GeminiInvoiceDetector(), sender)
+    return fetch_invoice_documents(source, build_detector(), sender)
 
 
 def main() -> None:
     graph = build_invoice_graph(
-        extractor=GeminiVisionExtractor(),
-        reasoner=GeminiExceptionReasoner(),
+        extractor=build_extractor(),
+        reasoner=build_reasoner(),
         ledger=Ledger(Path("ledger.jsonl")),
         sink=MockSubiektSink(),  # nieosiagalny: stop na bramce = brak ksiegowania
         checkpointer=persistent_checkpointer(_DB),

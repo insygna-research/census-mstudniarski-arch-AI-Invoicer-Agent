@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal, InvalidOperation
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from invoicer.models import Invoice, LineItem, Party
 
@@ -11,14 +11,46 @@ from invoicer.models import Invoice, LineItem, Party
 class PartyExtraction(BaseModel):
     name: str = Field(description="Nazwa firmy/strony")
     nip: str | None = Field(default=None, description="NIP (tylko cyfry), jesli jest")
-    country: str = Field(default="PL", description="Kod kraju ISO-2, np. PL, GB, DE")
+    # Bez defaultu — pole steruje klasyfikacja krajowa/zagraniczna; default="PL"
+    # pozwalal leniwym modelom pomijac pole i zakladal PL dla zagranicznych stron.
+    country: str = Field(
+        description=(
+            "Kod kraju ISO-2 strony: DOKLADNIE 2 litery, np. 'PL', 'DE', 'GB' — "
+            "NIGDY pelna nazwa kraju; wywnioskuj z adresu/VAT ID"
+        )
+    )
+
+    @field_validator("country")
+    @classmethod
+    def _country_iso2(cls, value: str) -> str:
+        """Normalizuje do ISO-2: pelna nazwa ('Germany') nie sparuje z EU_COUNTRIES
+        i unijna faktura poszlaby cicho sciezka poza-UE. Lokalne modele zwracaja
+        pelne nazwy mimo opisow pol — angielskie nazwy sa jednoznaczne, wiec
+        mapujemy przez pycountry; nieznane wartosci odrzucamy glosno."""
+        text = value.strip()
+        if len(text) == 2 and text.isalpha():
+            return text.upper()
+        import pycountry
+
+        try:
+            return pycountry.countries.lookup(text).alpha_2
+        except LookupError as exc:
+            raise ValueError(
+                f"country musi byc kodem ISO-2 (np. 'DE') albo znana nazwa kraju, nie: {value!r}"
+            ) from exc
+
     address: str | None = Field(default=None, description="Adres, jesli jest")
     vat_id: str | None = Field(default=None, description="Numer VAT UE/zagraniczny, jesli jest")
 
 
 class LineItemExtraction(BaseModel):
     description: str
-    quantity: str = Field(description="Ilosc jako liczba dziesietna w tekscie, np. '1' lub '2.5'")
+    quantity: str = Field(
+        description=(
+            "Ilosc jako SAMA liczba dziesietna w tekscie, np. '1', '2.5', '80' — "
+            "bez jednostek ('80', NIE '80 hrs'); jednostka nalezy do description"
+        )
+    )
     unit_net: str = Field(description="Cena jednostkowa netto, tekst, np. '1000.00'")
     vat_rate: str = Field(description="Stawka VAT jako ulamek dziesietny w tekscie, np. '0.23'")
     net: str = Field(description="Wartosc netto pozycji, tekst, np. '1000.00'")
@@ -52,6 +84,19 @@ def _amount(field: str, raw: str) -> Decimal:
         raise ValueError(f"Niepoprawna kwota w polu '{field}': {raw!r}") from exc
 
 
+def _vat_rate(raw: str) -> Decimal:
+    """Stawka VAT jako ulamek; akceptuje tez forme procentowa ('23%' -> 0.23).
+
+    Mniejsze modele (lokalny Qwen) zwracaja czasem '0%'/'23%' zamiast ulamka —
+    procent jest semantycznie jednoznaczny, wiec go normalizujemy; smieci
+    ('zw.', 'np.') nadal glosno odrzucamy w _amount.
+    """
+    text = raw.strip()
+    if text.endswith("%"):
+        return _amount("vat_rate", text[:-1].strip()) / 100
+    return _amount("vat_rate", text)
+
+
 def _iso_date(field: str, raw: str) -> date:
     try:
         return date.fromisoformat(raw)
@@ -68,7 +113,7 @@ def _line(line: LineItemExtraction) -> LineItem:
         description=line.description,
         quantity=_amount("quantity", line.quantity),
         unit_net=_amount("unit_net", line.unit_net),
-        vat_rate=_amount("vat_rate", line.vat_rate),
+        vat_rate=_vat_rate(line.vat_rate),
         net=_amount("net", line.net),
         vat=_amount("vat", line.vat),
         gross=_amount("gross", line.gross),

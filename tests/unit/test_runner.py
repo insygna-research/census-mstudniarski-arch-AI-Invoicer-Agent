@@ -102,6 +102,40 @@ def test_build_demo_graph_returns_runnable_graph(tmp_path):
     assert hasattr(graph, "invoke")  # skompilowany graf LangGraph
 
 
+def test_demo_adapters_honor_ollama_provider(monkeypatch):
+    # Ollama nie potrzebuje klucza API — provider=ollama wygrywa nawet bez GOOGLE_API_KEY.
+    monkeypatch.setenv("INVOICER_LLM_PROVIDER", "ollama")
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    from invoicer.adapters.ollama_extractor import OllamaVisionExtractor
+    from invoicer.adapters.ollama_reasoner import OllamaExceptionReasoner
+    from invoicer.runner import _demo_adapters
+
+    extractor, reasoner = _demo_adapters()
+    assert isinstance(extractor, OllamaVisionExtractor)
+    assert isinstance(reasoner, OllamaExceptionReasoner)
+
+
+def test_demo_adapters_fall_back_to_stubs_without_key(monkeypatch):
+    monkeypatch.delenv("INVOICER_LLM_PROVIDER", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    from invoicer.adapters.stub_reasoner import IdentityReasoner
+    from invoicer.runner import _demo_adapters
+
+    extractor, reasoner = _demo_adapters()
+    assert isinstance(extractor, StubExtractor)
+    assert isinstance(reasoner, IdentityReasoner)
+
+
+def test_demo_adapters_use_gemini_when_key_set(monkeypatch):
+    monkeypatch.delenv("INVOICER_LLM_PROVIDER", raising=False)
+    monkeypatch.setenv("GOOGLE_API_KEY", "AIza-test")
+    from invoicer.adapters.gemini_extractor import GeminiVisionExtractor
+    from invoicer.runner import _demo_adapters
+
+    extractor, _reasoner = _demo_adapters()
+    assert isinstance(extractor, GeminiVisionExtractor)
+
+
 class _FakeSource:
     def __init__(self, docs):
         self._docs = docs

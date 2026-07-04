@@ -27,9 +27,8 @@ from pathlib import Path
 
 import uvicorn
 
-from invoicer.adapters.gemini_extractor import GeminiVisionExtractor
-from invoicer.adapters.gemini_reasoner import GeminiExceptionReasoner
 from invoicer.adapters.mock_subiekt import MockSubiektSink
+from invoicer.adapters.provider import build_extractor, build_reasoner
 from invoicer.approvals import PendingApprovals
 from invoicer.graph.build import build_invoice_graph
 from invoicer.ledger import Ledger
@@ -55,8 +54,8 @@ def main() -> None:
     # extractor/reasoner sa leniwe i NIE sa wolane przy resume (po human_review leci tylko `book`),
     # wiec klucz GOOGLE_API_KEY nie jest tu potrzebny — graf musi tylko miec te sama strukture.
     graph = build_invoice_graph(
-        extractor=GeminiVisionExtractor(),
-        reasoner=GeminiExceptionReasoner(),
+        extractor=build_extractor(),
+        reasoner=build_reasoner(),
         ledger=Ledger(Path("ledger.jsonl")),
         sink=_sink(),
         checkpointer=persistent_checkpointer(_DB),

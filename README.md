@@ -165,6 +165,16 @@ A Streamlit demo (offline by default) shows the same human-review gate:
 uv run --group demo streamlit run src/invoicer/ui/streamlit_app.py
 ```
 
+### Local LLM (unlimited & private) — Ollama + Qwen3-VL
+
+No API key, no daily quotas, invoices never leave your machine. Applies to the demo and scripts (production stays on Gemini):
+
+```bash
+brew install ollama && brew services start ollama && ollama pull qwen3-vl:8b-instruct
+INVOICER_LLM_PROVIDER=ollama uv run --group demo streamlit run src/invoicer/ui/streamlit_app.py
+INVOICER_LLM_PROVIDER=ollama PYTHONPATH=src uv run python scripts/run_flow_now.py fv.pdf
+```
+
 ### Full RAG (real grounding) — Postgres + Voyage
 
 ```bash

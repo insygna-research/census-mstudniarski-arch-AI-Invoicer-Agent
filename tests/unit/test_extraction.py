@@ -58,11 +58,38 @@ def test_mapper_handles_optional_dates():
     assert inv.due_date is None
 
 
+def test_party_country_is_required():
+    # Bez defaultu: default="PL" pozwalal leniwym modelom pomijac pole, przez co
+    # zagraniczny sprzedawca dostawal kraj PL i faktura szla sciezka krajowa.
+    with pytest.raises(ValidationError):
+        PartyExtraction(name="Nordwind Solutions GmbH")
+
+
+def test_party_country_full_names_normalize_to_iso2():
+    # Lokalny model uparcie zwraca pelne nazwy ('Germany') mimo opisow pol — pelna
+    # nazwa nie sparuje z EU_COUNTRIES i unijna faktura poszlaby sciezka poza-UE.
+    # Angielskie nazwy sa jednoznaczne -> normalizujemy przez pycountry.
+    assert PartyExtraction(name="X", country="Germany").country == "DE"
+    assert PartyExtraction(name="X", country="Poland").country == "PL"
+    assert PartyExtraction(name="X", country="United Kingdom").country == "GB"
+
+
+def test_party_country_unknown_name_raises():
+    # Nieznana nazwa: glosny fail > cicha zla klasyfikacja.
+    with pytest.raises(ValidationError):
+        PartyExtraction(name="X", country="Xlandia")
+
+
+def test_party_country_normalizes_case():
+    assert PartyExtraction(name="X", country="de").country == "DE"
+    assert PartyExtraction(name="X", country=" pl ").country == "PL"
+
+
 def test_confidence_is_bounded_0_1():
     with pytest.raises(ValidationError):
         InvoiceExtraction(
-            seller=PartyExtraction(name="A"),
-            buyer=PartyExtraction(name="B"),
+            seller=PartyExtraction(name="A", country="PL"),
+            buyer=PartyExtraction(name="B", country="PL"),
             number="X",
             issue_date="2026-01-01",
             lines=[],
@@ -84,4 +111,29 @@ def test_malformed_date_raises_with_field_context():
     ex = _extraction()
     ex.issue_date = "01/06/2026"
     with pytest.raises(ValueError, match="issue_date"):
+        extraction_to_invoice(ex)
+
+
+def test_vat_rate_accepts_percent_form():
+    # Mniejsze modele (lokalny Qwen) potrafia zwrocic '0%'/'23%' zamiast ulamka —
+    # forma procentowa jest semantycznie jednoznaczna, wiec ja normalizujemy.
+    from decimal import Decimal
+
+    ex = _extraction()
+    ex.lines[0].vat_rate = "0%"
+    assert extraction_to_invoice(ex).lines[0].vat_rate == Decimal("0")
+
+    ex = _extraction()
+    ex.lines[0].vat_rate = "23%"
+    assert extraction_to_invoice(ex).lines[0].vat_rate == Decimal("0.23")
+
+    ex = _extraction()
+    ex.lines[0].vat_rate = " 8 % "
+    assert extraction_to_invoice(ex).lines[0].vat_rate == Decimal("0.08")
+
+
+def test_vat_rate_garbage_still_raises():
+    ex = _extraction()
+    ex.lines[0].vat_rate = "zw."
+    with pytest.raises(ValueError, match="vat_rate"):
         extraction_to_invoice(ex)

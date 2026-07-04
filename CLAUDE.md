@@ -22,6 +22,10 @@ uv run pytest tests/live -v
 # Demo UI (offline na stubach, gdy brak GOOGLE_API_KEY):
 uv run --group demo streamlit run src/invoicer/ui/streamlit_app.py
 
+# Lokalny LLM bez limitow (Ollama + Qwen3-VL; dotyczy runnera/skryptow/Streamlit, NIE app.py):
+#   wymaga: brew install ollama && brew services start ollama && ollama pull qwen3-vl:8b-instruct
+INVOICER_LLM_PROVIDER=ollama uv run --group demo streamlit run src/invoicer/ui/streamlit_app.py
+
 # Skrypty (pytest ma pythonpath=src, goly python NIE — stad PYTHONPATH):
 PYTHONPATH=.:src uv run python scripts/run_evals.py
 
@@ -29,7 +33,7 @@ PYTHONPATH=.:src uv run python scripts/run_evals.py
 docker run -d --name invoicer-pgvector -e POSTGRES_PASSWORD=x -p 5432:5432 pgvector/pgvector:pg16
 PYTHONPATH=src uv run python scripts/ingest_legal_corpus.py   # idempotentny ingest korpusu
 
-# Deploy: lokalnie (workflow deploy.yml wymaga sekretu FLY_API_TOKEN — obecnie nieustawiony):
+# Deploy: push na github/main z zielonym CI auto-deployuje (deploy.yml); awaryjnie lokalnie:
 fly deploy
 ```
 
@@ -39,9 +43,11 @@ fly deploy
 
 **Graf LangGraph** (`graph/build.py` + `graph/nodes.py`): `extract -> validate -> classify -> [faktury zagraniczne: retrieve_legal_context -> reason_exception -> verify_grounding] -> human_review -> book`. Human-in-the-loop = LangGraph `interrupt` + checkpointer SQLite; wznowienie przez webhook Twilio (`/whatsapp/inbound` w `app.py`) lub podpisane approval-linki. Faktury PL omijaja RAG; zagraniczne dostaja kontekst prawny, a `verify_grounding` sprawdza, czy cytaty zawieraja sie w zrodle.
 
-**Kompozycja grafu w trzech miejscach:** `app.py` (produkcyjny FastAPI: `preflight_env` fail-fast na brakujace sekrety, APScheduler robi intake co `INTAKE_INTERVAL_MINUTES`, `/status` zwraca metryki LLM i pipeline), `runner.py` (`build_demo_graph`: realne adaptery gdy `GOOGLE_API_KEY`, inaczej stuby offline — z tego korzysta Streamlit), `scripts/` (jednorazowe przebiegi i debug).
+**Kompozycja grafu w trzech miejscach:** `app.py` (produkcyjny FastAPI: `preflight_env` fail-fast na brakujace sekrety, APScheduler robi intake co `INTAKE_INTERVAL_MINUTES`, `/status` zwraca metryki LLM i pipeline), `runner.py` (`build_demo_graph`: realny LLM wg `INVOICER_LLM_PROVIDER`/`GOOGLE_API_KEY`, inaczej stuby offline — z tego korzysta Streamlit), `scripts/` (jednorazowe przebiegi i debug; adaptery przez `adapters/provider.py`).
 
 **LLM — split modeli i retry.** Trzy adaptery `gemini_*` z publicznym `DEFAULT_MODEL`: extractor i reasoner na `gemini-2.5-flash`, detektor na `gemini-2.5-flash-lite`. Powod: darmowy tier Gemini ma dzienna pule **20 zapytan na model** (reset ~09:00 PL); pule sa per model, a jakosc osadu VAT wymaga flasha (lite mylil wnt z import_towarow). Kazde wywolanie modelu idzie przez `gemini_retry.call_with_rate_limit_retry` (429/500/503 + bledy transportowe httpx — langchain-google-genai sam ich NIE ponawia); analogicznie Voyage (3 RPM) przez `voyage_retry`. Nowe wywolania LLM/embeddingow tez prowadz przez te helpery.
+
+**Provider lokalny (Ollama).** `adapters/provider.py` wybiera provider dla lokalnych sciezek: `INVOICER_LLM_PROVIDER=ollama` -> adaptery `ollama_*` (Qwen3-VL 8B, `ChatOllama`, structured output przez `method="json_schema"`); PDF rasteryzowany do PNG per strona przez `adapters/pdf_render.py` (Ollama nie przyjmuje PDF). Bez limitow i bez klucza — do testow lokalnych; produkcyjny `app.py` celowo NIE korzysta z przelacznika (512 MB VM nie udzwignie lokalnego modelu).
 
 **Structured output.** Schematy Pydantic: `extraction.py` (InvoiceExtraction), `reasoning.py` (ClassificationJudgment), InvoiceCheck w `gemini_detector.py` — przez `with_structured_output`. `extraction_to_invoice` parsuje scisle (Decimal, daty ISO) i glosno odrzuca zly output modelu.
 

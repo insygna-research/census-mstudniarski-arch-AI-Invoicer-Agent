@@ -23,9 +23,8 @@ from pathlib import Path
 
 import httpx
 
-from invoicer.adapters.gemini_extractor import GeminiVisionExtractor
-from invoicer.adapters.gemini_reasoner import GeminiExceptionReasoner
 from invoicer.adapters.mock_subiekt import MockSubiektSink
+from invoicer.adapters.provider import build_detector, build_extractor, build_reasoner
 from invoicer.adapters.twilio_whatsapp import TwilioError, build_twilio_whatsapp_channel
 from invoicer.graph.build import build_invoice_graph
 from invoicer.ledger import Ledger
@@ -60,14 +59,13 @@ def _documents() -> list[InvoiceDocument]:
     if len(sys.argv) > 1:
         path = Path(sys.argv[1])
         return [document_from_upload(path.name, path.read_bytes())]
-    from invoicer.adapters.gemini_detector import GeminiInvoiceDetector
     from invoicer.adapters.gmail import GmailAdapter
     from invoicer.adapters.gmail_auth import gmail_service_from_token
     from invoicer.runner import fetch_invoice_documents
 
     service = gmail_service_from_token(Path(os.getenv("GMAIL_TOKEN", "token.json")))
     sender = os.environ["GMAIL_SENDER_FILTER"]
-    return fetch_invoice_documents(GmailAdapter(service), GeminiInvoiceDetector(), sender)
+    return fetch_invoice_documents(GmailAdapter(service), build_detector(), sender)
 
 
 def _wait_for_decision(client: httpx.Client, since: datetime):
@@ -108,8 +106,8 @@ def _existing_booking_id(ledger: Ledger, number: str, nip: str | None, name: str
 def main() -> None:
     ledger = Ledger(Path("ledger.jsonl"))
     graph = build_invoice_graph(
-        extractor=GeminiVisionExtractor(),
-        reasoner=GeminiExceptionReasoner(),
+        extractor=build_extractor(),
+        reasoner=build_reasoner(),
         ledger=ledger,
         sink=_sink(),
         checkpointer=persistent_checkpointer(_DB),

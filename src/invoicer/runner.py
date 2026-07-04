@@ -170,17 +170,19 @@ def build_sink():
     return MockSubiektSink()
 
 
-def build_demo_graph(*, ledger_path: Path):
-    """Buduje graf demo: realny Gemini gdy GOOGLE_API_KEY, inaczej offline (stub)."""
-    if os.getenv("GOOGLE_API_KEY"):
-        from invoicer.adapters.gemini_extractor import GeminiVisionExtractor
-        from invoicer.adapters.gemini_reasoner import GeminiExceptionReasoner
+def _demo_adapters() -> tuple[InvoiceExtractor, ExceptionReasoner]:
+    """Realny LLM wg INVOICER_LLM_PROVIDER (ollama = lokalny, bez klucza);
+    gemini wymaga GOOGLE_API_KEY — bez niego stuby offline."""
+    from invoicer.adapters.provider import build_extractor, build_reasoner, provider_name
 
-        extractor: InvoiceExtractor = GeminiVisionExtractor()
-        reasoner: ExceptionReasoner = GeminiExceptionReasoner()
-    else:
-        extractor = StubExtractor(_demo_invoice())
-        reasoner = IdentityReasoner()
+    if provider_name() == "ollama" or os.getenv("GOOGLE_API_KEY"):
+        return build_extractor(), build_reasoner()
+    return StubExtractor(_demo_invoice()), IdentityReasoner()
+
+
+def build_demo_graph(*, ledger_path: Path):
+    """Buduje graf demo: realny LLM (Gemini/Ollama), inaczej offline (stub)."""
+    extractor, reasoner = _demo_adapters()
     return build_invoice_graph(
         extractor=extractor,
         reasoner=reasoner,
