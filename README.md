@@ -318,6 +318,20 @@ Dockerfile · fly.toml · pyproject.toml
 - [ ] Post-book fan-out to more SaaS (Slack / Drive / BI) — candidate for n8n
 - [ ] Retry loop for low-confidence extraction; Streamlit as the primary review UI
 
+## Production readiness — known gaps
+
+This runs end-to-end 24/7 on real integrations, but "works for me" and "ready for a client" are different bars. What's already production-grade: TDD suite (370 tests, 86% coverage gated in CI), human gate before every booking, hash-chained audit ledger, webhook signature validation, PII-redacted logs, prompt-injection defenses, LLM metrics + Sentry, and rate-limit retries on every external API. What a real deployment would still need:
+
+| Gap | Why it matters | What "client-ready" takes |
+|---|---|---|
+| **Free-tier LLM** | Gemini free tier trains on submitted data (a GDPR non-starter for real invoices) and caps at 20 requests/day/model (~8–10 foreign invoices) with no SLA | Paid API key or Vertex AI with a DPA; or a local VLM for full data residency |
+| **Data-processing agreements** | PII flows through Google (LLM), Twilio (US) and Gmail | DPAs, retention policy, processing register — deployment work, not code |
+| **Personal accounts** | Gmail OAuth token, AI Studio key and Fly account are the author's | Dedicated service accounts, secret rotation, `FLY_API_TOKEN` so deploys go through CI, not a laptop |
+| **Quality measured on synthetic data** | The eval golden set is 30 curated cases | Eval on a sample of the client's actual invoices (layouts, currencies, corrections, poor scans) + confidence thresholds routing low-confidence cases to a human with no pre-filled proposal |
+| **Single 512 MB machine, state on one volume** | SQLite checkpointer + ledger on a single Fly volume — no HA, volume loss = audit-trail loss | Volume snapshots/backup, DR plan; consider Postgres for the checkpointer |
+| **Narrow functional scope** | Handles cost invoices with straightforward reverse charge; real clients bring corrections, duplicates, pro-formas, multi-page scans | An explicit out-of-scope list, contractually agreed |
+| **Liability** | LLM tax classification is an assistive tool | Contract language making the human approver responsible for every booking |
+
 ---
 
 *Portfolio project. It demonstrates agent design, Polish-tax domain modeling, legal-grounded RAG, and security-conscious LLM integration; it is not a certified tax tool — every booking is gated by a human.*
