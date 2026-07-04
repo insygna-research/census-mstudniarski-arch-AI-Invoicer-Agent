@@ -10,9 +10,10 @@ Agentowy asystent ksiegowy (portfolio AI/GenAI): Gmail -> detekcja zalacznikow -
 
 ```bash
 uv sync                                              # srodowisko (wszystko odpalaj przez `uv run`)
-uv run pytest -q --cov=src --cov-fail-under=84       # pelny suite (bramka CI: coverage 84%)
+uv run pytest -q --cov=invoicer --cov-fail-under=84  # pelny suite (bramka CI: coverage 84%)
 uv run pytest tests/unit/test_gemini_extractor.py::test_nazwa -q   # pojedynczy test
 uv run ruff check .                                  # lint (line-length 100)
+uv run ruff format --check .                         # format — CI to egzekwuje; PRZED pushem!
 uv run mypy                                          # typy (files=src)
 
 # Testy live (realne API): skipif bez GOOGLE_API_KEY + tests/live/fixtures/sample_invoice.pdf

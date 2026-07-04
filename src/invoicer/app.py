@@ -218,9 +218,7 @@ def create_app(*, settings: AppSettings | None = None) -> FastAPI:
                 registry,
                 GmailAdapter(service, lookback_days=settings.gmail_lookback_days),
                 gemini_detector.GeminiInvoiceDetector(
-                    callbacks=[
-                        LlmMetricsCallback(metrics, model=gemini_detector.DEFAULT_MODEL)
-                    ]
+                    callbacks=[LlmMetricsCallback(metrics, model=gemini_detector.DEFAULT_MODEL)]
                 ),
                 sender=settings.gmail_sender,
                 phone=settings.approver_phone,
