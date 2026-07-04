@@ -52,6 +52,36 @@ def test_other_errors_are_not_retried():
     assert sleeps == []
 
 
+def test_connection_error_is_retried():
+    # Voyage potrafi zerwac polaczenie bez odpowiedzi (RemoteDisconnected) —
+    # blad przejsciowy, ponawiamy jak rate limit.
+    sleeps: list[float] = []
+    attempts = iter([voyage_error.APIConnectionError("Error communicating with VoyageAI"), "ok"])
+
+    def flaky():
+        item = next(attempts)
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+    assert call_with_rate_limit_retry(flaky, wait_s=21.0, sleep=sleeps.append) == "ok"
+    assert sleeps == [21.0]
+
+
+def test_service_unavailable_is_retried():
+    sleeps: list[float] = []
+    attempts = iter([voyage_error.ServiceUnavailableError("503"), "ok"])
+
+    def flaky():
+        item = next(attempts)
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+    assert call_with_rate_limit_retry(flaky, sleep=sleeps.append) == "ok"
+    assert len(sleeps) == 1
+
+
 class _FlakyVoyageClient:
     """Fake klienta voyageai: pierwsze wywolanie kazdej metody -> RateLimitError, potem wynik."""
 

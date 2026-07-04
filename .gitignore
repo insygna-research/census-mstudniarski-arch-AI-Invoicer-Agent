@@ -19,4 +19,4 @@ client_secret*.json
 htmlcov/
 
 # Checkpoint evalu (dokanczanie przez wiele dni w ramach kwot darmowego tieru)
-data/evals/.eval_checkpoint.jsonl
+data/evals/.eval_checkpoint*.jsonl

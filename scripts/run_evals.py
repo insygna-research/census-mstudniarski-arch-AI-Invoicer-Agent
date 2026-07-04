@@ -1,11 +1,12 @@
 """Live eval harness dla legal-grounded RAG.
 
-Wymaga VOYAGE_API_KEY + DATABASE_URL + GOOGLE_API_KEY.
+Wymaga VOYAGE_API_KEY + DATABASE_URL oraz GOOGLE_API_KEY
+(albo INVOICER_LLM_PROVIDER=ollama — lokalny reasoner, bez klucza i bez kwot).
 
 Uruchom: PYTHONPATH=.:src VOYAGE_API_KEY=... DATABASE_URL=... GOOGLE_API_KEY=... \
     uv run python scripts/run_evals.py
 Zaklada zindeksowany korpus (scripts/ingest_legal_corpus.py).
-Koszt: ~60 wywolan Gemini (30 przypadkow x with/without RAG) + retrieval Voyage.
+Koszt: ~60 wywolan reasonera (30 przypadkow x with/without RAG) + retrieval Voyage.
 """
 
 from __future__ import annotations
@@ -13,8 +14,8 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
-from invoicer.adapters.gemini_reasoner import GeminiExceptionReasoner
 from invoicer.adapters.pgvector_store import PgVectorLegalStore
+from invoicer.adapters.provider import build_reasoner, provider_name
 from invoicer.adapters.voyage_embedder import VoyageEmbedder
 from invoicer.adapters.voyage_reranker import VoyageReranker
 from invoicer.graph.nodes import EU_COUNTRIES
@@ -33,11 +34,25 @@ from invoicer.rag.eval import (
 from invoicer.rag.query import build_retrieval_query
 
 _CASES = Path(__file__).resolve().parents[1] / "data" / "evals" / "legal_cases.jsonl"
-_REPORT = Path(__file__).resolve().parents[1] / "docs" / "evals" / "legal-rag-report.md"
-# Checkpoint: dzienna kwota darmowego tieru (20 zapytan/model) nie miesci 60 wywolan —
-# przerwany bieg dokancza sie kolejnego dnia od miejsca przerwania. Kasowany po raporcie.
-_CHECKPOINT = Path(__file__).resolve().parents[1] / "data" / "evals" / ".eval_checkpoint.jsonl"
-_SETUP = "pgvector · voyage-3-large · rerank-2.5 · gemini-2.5-flash (reasoner)"
+
+# Eval honoruje INVOICER_LLM_PROVIDER (jak runner/skrypty). Raport i checkpoint sa
+# per provider: wyniki lokalnej Ollamy nie moga nadpisac raportu produkcyjnego Gemini
+# ani zmieszac sie w checkpoincie (kasowanym po pelnym raporcie).
+# gemini -> legal-rag-report.md (raport prod), ollama -> legal-rag-report-ollama.md.
+_PROVIDER = provider_name()
+_REPORT_NAME = (
+    "legal-rag-report.md" if _PROVIDER == "gemini" else f"legal-rag-report-{_PROVIDER}.md"
+)
+_REPORT = Path(__file__).resolve().parents[1] / "docs" / "evals" / _REPORT_NAME
+_CHECKPOINT = (
+    Path(__file__).resolve().parents[1] / "data" / "evals" / f".eval_checkpoint.{_PROVIDER}.jsonl"
+)
+
+
+def _setup() -> str:
+    """Opis setupu do raportu — z realnym modelem reasonera, nie zgadywanym."""
+    model = build_reasoner()._model
+    return f"pgvector · voyage-3-large · rerank-2.5 · {model} ({_PROVIDER} reasoner)"
 
 
 def _store() -> PgVectorLegalStore:
@@ -82,7 +97,7 @@ def evaluate_reasoning(checkpoint: dict[str, dict], *, with_rag: bool, k: int = 
     """
     label = "with-rag" if with_rag else "no-rag"
     store = _store() if with_rag else None
-    reasoner = GeminiExceptionReasoner()
+    reasoner = build_reasoner()
     cases = load_cases(_CASES)
     hits, faiths = [], []
     for case in cases:
@@ -132,7 +147,7 @@ def main() -> None:
             retrieval=retrieval,
             with_rag=with_rag,
             without_rag=without_rag,
-            setup=_SETUP,
+            setup=_setup(),
         ),
         encoding="utf-8",
     )
