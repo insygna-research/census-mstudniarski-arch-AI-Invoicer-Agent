@@ -1,6 +1,6 @@
-# Invoicer
+# AI-Invoicer-Agent
 
-[![CI](https://github.com/mstudniarski-arch/invoicer/actions/workflows/ci.yml/badge.svg)](https://github.com/mstudniarski-arch/invoicer/actions/workflows/ci.yml)
+[![CI](https://github.com/mstudniarski-arch/AI-Invoicer-Agent/actions/workflows/ci.yml/badge.svg)](https://github.com/mstudniarski-arch/AI-Invoicer-Agent/actions/workflows/ci.yml)
 
 > Agentic AI assistant that pulls invoices from a mailbox, extracts and validates them under **Polish tax law**, reasons about edge cases (e.g. a UK invoice with no VAT) grounded in the actual statute, and books them to accounting software — **only after a human approves over WhatsApp**.
 
