@@ -248,5 +248,9 @@ def create_app(*, settings: AppSettings | None = None) -> FastAPI:
 app: FastAPI | None = None
 
 
-def _factory() -> FastAPI:  # uvicorn factory mode (patrz Dockerfile CMD)
-    return create_app()
+def _factory():  # uvicorn factory mode (patrz Dockerfile CMD)
+    # Bez kompletu sekretow rdzennych proces nie pada: SetupGate wystawia /setup i po zapisie
+    # przelacza sie na pelna aplikacje (create_app). Z kompletem — od razu create_app, jak dotad.
+    from invoicer.setup import SetupGate
+
+    return SetupGate(create_app, preflight_env)
